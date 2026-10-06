@@ -748,6 +748,6 @@ window.MEDITATION_CONFIG = {
   "meer": true
  },
  "settings": {
-  "pause": 2.0
+  "pause": 2.5
  }
 };
