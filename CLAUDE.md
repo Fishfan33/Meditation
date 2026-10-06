@@ -141,6 +141,16 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
   geprüft, keine versteckten Ordner wie `.git`, keine Ordnerlisten), Datenschutzseite auf die Aufnahmen angepasst, keine
   persönlichen Angaben in Projektdateien („der Inhaber“); erstes Hochladen als neue Geschichte (siehe oben).
 
+## Weiter am nächsten Tag (Stand 6. Oktober 2026, abends)
+
+- **Stimme natürlicher machen:** Hörproben `hoerproben/vergleich/` (1 Piper wie jetzt, 2 Piper lebendiger:
+  length 1,2, noise 0,85, noise-w 1,1). Als Nächstes: XTTS-v2 mit Thorsten-Vorlage installieren (2–3 GB, eigener Ordner,
+  vorher Sicherheitsprüfung wie bei Piper erklären) und Proben 3/4 erzeugen; Alternativen für Deutsch: Azure
+  Killian/Conrad (Konto nötig), ElevenLabs (bezahlt). Der Inhaber entscheidet nach Gehör.
+- **Arbeitskopie `korrektur/pause-vorschau`** (Übernahme-Anfrage #1): enthält zusätzlich die Satz-Pausen und neue
+  Aufnahmen; lokal gespeichert, **Hochladen nur nach OK**.
+- Danach: durchgehende Tonspur fürs gesperrte iPhone, iPhone-Test, automatische Tests, Audit (alle Bereiche).
+
 ## Erkenntnisse aus dem Retro-Cockpit
 
 Vorbild ist das Schwesterprojekt Retro-Cockpit (Ordner `retro-cockpit` auf demselben Rechner, öffentlich unter
