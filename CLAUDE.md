@@ -144,7 +144,7 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
 ## Weiter am nächsten Tag (Stand 6. Oktober 2026, abends)
 
 - **Stimme natürlicher machen:** Hörproben `hoerproben/vergleich/` (1 Piper wie jetzt, 2 Piper lebendiger:
-  length 1,2, noise 0,85, noise-w 1,1). Als Nächstes: XTTS-v2 mit Thorsten-Vorlage installieren (2–3 GB, eigener Ordner,
+  length 1,2, noise 0,85, noise-w 1,1) – **„lebendiger“ ist laut Inhaber schlechter, Piper-Einstellungen bleiben (A2)**. Als Nächstes: XTTS-v2 mit Thorsten-Vorlage installieren (2–3 GB, eigener Ordner,
   vorher Sicherheitsprüfung wie bei Piper erklären) und Proben 3/4 erzeugen; Alternativen für Deutsch: Azure
   Killian/Conrad (Konto nötig), ElevenLabs (bezahlt). Der Inhaber entscheidet nach Gehör.
 - **Arbeitskopie `korrektur/pause-vorschau`** (Übernahme-Anfrage #1): enthält zusätzlich die Satz-Pausen und neue
