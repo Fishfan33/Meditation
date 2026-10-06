@@ -242,7 +242,7 @@ window.MEDITATION_CONFIG = {
    {
     "id": "g-strand",
     "name": "Strand",
-    "active": true,
+    "active": false,
     "items": [
      {
       "id": "strand1",
@@ -284,7 +284,7 @@ window.MEDITATION_CONFIG = {
    {
     "id": "g-wald",
     "name": "Wald",
-    "active": true,
+    "active": false,
     "items": [
      {
       "id": "wald1",
@@ -368,7 +368,7 @@ window.MEDITATION_CONFIG = {
    {
     "id": "g-see",
     "name": "Bergsee",
-    "active": true,
+    "active": false,
     "items": [
      {
       "id": "see1",
@@ -405,7 +405,7 @@ window.MEDITATION_CONFIG = {
    {
     "id": "g-garten",
     "name": "Garten",
-    "active": true,
+    "active": false,
     "items": [
      {
       "id": "garten1",
@@ -746,5 +746,8 @@ window.MEDITATION_CONFIG = {
   "wald": true,
   "wind": true,
   "meer": true
+ },
+ "settings": {
+  "pause": 2.0
  }
 };
