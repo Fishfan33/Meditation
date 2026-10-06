@@ -30,9 +30,14 @@ const recordingOf = text => {
   return !r ? null : typeof r[0] === "string" ? [r] : r;
 };
 const voiceBuffers = new Map();   // Datei → dekodierter Ton (einmal laden, dann aus dem Speicher)
+// Schlägt das Laden fehl (am iPhone z. B., wenn zu viele Aufnahmen gleichzeitig entpackt werden), wird es nicht als
+// „keine Aufnahme“ gemerkt, sondern beim nächsten Mal erneut versucht.
 function loadFile(file) {
   if (!voiceBuffers.has(file)) {
-    voiceBuffers.set(file, fetch(file).then(r => r.arrayBuffer()).then(b => audioCtx.decodeAudioData(b)).catch(() => null));
+    const p = fetch(file).then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+      .then(b => new Promise((ok, fail) => audioCtx.decodeAudioData(b, ok, fail)))
+      .catch(() => { voiceBuffers.delete(file); return null; });
+    voiceBuffers.set(file, p);
   }
   return voiceBuffers.get(file);
 }
@@ -42,7 +47,10 @@ function loadRecording(text) {
   return Promise.all(parts.map(([file]) => loadFile(file))).then(bufs => bufs.every(Boolean) ? bufs : null);
 }
 // Vorab laden, z. B. alle Sätze einer Meditation, während der Gong klingt
-const preloadRecordings = texts => texts.forEach(loadRecording);
+// Nacheinander statt alle auf einmal: das iPhone verkraftet viele gleichzeitige Entpackungen nicht
+function preloadRecordings(texts) {
+  texts.reduce((kette, t) => kette.then(() => loadRecording(t)), Promise.resolve());
+}
 let voiceSources = [], speakToken = 0;
 
 // Spruch vorlesen; `done` läuft, wenn er fertig ist (oder abgebrochen wurde). Die Sätze werden auf der Zeitachse des
@@ -52,7 +60,7 @@ function speak(text, done) {
   if (recordingOf(text) && audioCtx) {
     loadRecording(text).then(bufs => {
       if (token !== speakToken) return;   // inzwischen abgebrochen oder ein anderer Spruch
-      if (!bufs) { speakSynth(text, done); return; }
+      if (!bufs) { speakFiles(recordingOf(text), token, () => speakSynth(text, done), done); return; }
       let t = audioCtx.currentTime + .02;
       voiceSources = bufs.map((buf, k) => {
         const src = audioCtx.createBufferSource();
@@ -67,6 +75,20 @@ function speak(text, done) {
     return;
   }
   speakSynth(text, done);
+}
+// Zweiter Weg ohne Entpacken: die Aufnahmen direkt als Tondatei abspielen (Satz für Satz, mit der Pause dazwischen).
+// Erst wenn auch das nicht geht, liest die Stimme des Browsers.
+let fileAudio = null;
+function speakFiles(parts, token, fallback, done) {
+  const next = k => {
+    if (token !== speakToken) return;
+    if (k >= parts.length) { fileAudio = null; done?.(); return; }
+    const a = new Audio(parts[k][0]);
+    fileAudio = a;
+    a.onended = () => setTimeout(() => next(k + 1), k < parts.length - 1 ? settings.pause * 1000 : 0);
+    a.play().catch(() => { if (k === 0) { fileAudio = null; fallback(); } else next(k + 1); });
+  };
+  next(0);
 }
 function speakSynth(text, done) {
   if (!synth) { done?.(); return; }
@@ -83,6 +105,7 @@ function stopSpeaking() {
   const srcs = voiceSources;
   voiceSources = [];
   srcs.forEach(src => { src.onended = null; try { src.stop(); } catch {} });
+  if (fileAudio) { fileAudio.onended = null; fileAudio.pause(); fileAudio = null; }
   synth?.cancel();
 }
 
