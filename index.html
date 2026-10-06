@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meditation</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; connect-src 'self'; media-src 'self'; worker-src 'self'; manifest-src 'self'; style-src 'self' 'unsafe-inline'; style-src-elem 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<!-- Installierbar als App (manifest.json), offline über sw.js -->
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Meditation">
+<meta name="theme-color" content="#f4f2ee" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#12141b" media="(prefers-color-scheme: dark)">
+<link rel="preload" href="fonts/AtkinsonHyperlegible-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/AtkinsonHyperlegible-Bold.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/InterZiffern-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/InterZiffern-Bold.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="app.css?v=23f90b6b">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img class="logo" src="icons/icon.svg" width="34" height="34" alt="">
+    <h1>Meditation</h1>
+    <!-- Nur lokal (Admin): Sprüche und Klänge verwalten. In der veröffentlichten Version unsichtbar -->
+    <button class="btn sm admin-btn" id="adminBtn" hidden title="Nur sichtbar, wenn die App lokal geöffnet ist">
+      <span aria-hidden="true">⚙️</span> Verwalten</button>
+  </header>
+
+  <main>
+    <!-- Oben: Gesamtdauer und Hintergrundklang. Darunter die Skala zum Wischen (Wahl B des Inhabers): schmal, beim
+         Antippen groß, rastet jede Minute ein -->
+    <div class="topbar">
+      <output class="dur-value" id="durValue" aria-hidden="true"></output>
+      <div class="sound-wrap">
+        <button class="sound-btn" aria-haspopup="true" aria-expanded="false"></button>
+        <div class="sound-menu" role="menu" aria-label="Hintergrundklang" hidden></div>
+      </div>
+    </div>
+    <div class="ruler-box">
+      <div class="ruler" id="ruler" role="slider" tabindex="0" aria-label="Dauer der Meditation"
+        aria-valuemin="5" aria-valuemax="90"><div class="ruler-track" id="rulerTrack"></div></div>
+      <div class="ruler-needle" aria-hidden="true"></div>
+    </div>
+
+    <div class="orb-wrap">
+      <button class="start-orb" id="startBtn"><span class="start-label">Starten</span><span class="start-sub" id="startSub"></span></button>
+    </div>
+
+    <!-- Phasen als Schalter: dabei oder nicht dabei; die Reihenfolge bleibt immer gleich -->
+    <div class="chips" id="chips" role="group" aria-label="Phasen der Meditation"></div>
+
+    <!-- Unten zum Aufklappen: Zeiten der Phasen im Balken, mit Griffen gegeneinander verschieben -->
+    <details class="fold" id="fold">
+      <summary><span>Zeiten der Phasen</span><span class="chev" aria-hidden="true">▾</span></summary>
+      <div id="timeline"></div>
+      <p class="fold-hint">Griffe zwischen den Phasen ziehen oder mit den Pfeiltasten verschieben, je 1 Min.
+        Die Gesamtdauer bleibt gleich.</p>
+    </details>
+
+    <p class="voice-note" id="voiceNote"></p>
+  </main>
+
+  <footer>
+    <span>Speichert nichts. Jede Meditation wird beim Starten neu gemischt.</span>
+    <a href="datenschutz.html">Datenschutz</a>
+  </footer>
+</div>
+
+<!-- Symbole für den Hintergrundklang (werden per JavaScript in Knopf und Auswahl kopiert) -->
+<template id="soundIcons">
+  <span data-icon="regen"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 14a4 4 0 1 1 .9-7.9A5 5 0 0 1 17.5 7 3.5 3.5 0 0 1 17 14z"/><path d="M8 17l-1 3M12 17l-1 3M16 17l-1 3"/></svg></span>
+  <span data-icon="wald"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l5 7h-3l4 6H6l4-6H7z"/><path d="M12 16v5"/></svg></span>
+  <span data-icon="wind"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9h11a3 3 0 1 0-3-3"/><path d="M3 13h15a3 3 0 1 1-3 3"/><path d="M3 17h7"/></svg></span>
+  <span data-icon="meer"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9c2.5-2 5-2 7.5 0s5 2 7.5 0 3.5-1.5 5-1"/><path d="M2 14c2.5-2 5-2 7.5 0s5 2 7.5 0 3.5-1.5 5-1"/><path d="M2 19c2.5-2 5-2 7.5 0s5 2 7.5 0 3.5-1.5 5-1"/></svg></span>
+  <span data-icon="aus"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M17 10l4 4M21 10l-4 4"/></svg></span>
+  <span data-icon="leise"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 10v4h3l4 3.5v-11L8 10z"/><path d="M15.5 10a3 3 0 0 1 0 4"/></svg></span>
+  <span data-icon="klang"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16.5 9a4.5 4.5 0 0 1 0 6M19 6.5a8 8 0 0 1 0 11"/></svg></span>
+</template>
+
+<!-- Die laufende Meditation: ganzer Bildschirm, ruhig und dunkel -->
+<dialog class="session" id="session" aria-labelledby="sPhase">
+  <div class="s-wrap">
+    <div class="s-top">
+      <span class="s-phase" id="sPhase"></span>
+      <span class="s-right">
+        <span class="s-left" id="sLeft"></span>
+        <!-- Dieselbe Klang-Auswahl wie auf der Startseite, auch während der Meditation (Inhaber) -->
+        <span class="sound-wrap">
+          <button class="sound-btn" aria-haspopup="true" aria-expanded="false"></button>
+          <span class="sound-menu" role="menu" aria-label="Hintergrundklang" hidden></span>
+        </span>
+      </span>
+    </div>
+    <div class="s-center">
+      <div class="s-orb" aria-hidden="true"></div>
+      <p class="s-line" id="sLine" aria-live="polite"></p>
+    </div>
+    <div class="s-bar" id="sBar" aria-hidden="true"></div>
+    <div class="s-controls" id="sControls">
+      <button class="s-btn" id="sPause" aria-label="Pause" title="Pause">
+        <svg viewBox="0 0 24 24" aria-hidden="true" class="i-pause"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true" class="i-play"><path d="M8 5.5v13l11-6.5z"/></svg>
+      </button>
+      <button class="s-btn" id="sNext" aria-label="Nächste Phase" title="Nächste Phase">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5.5v13l9-6.5zM15.5 5H19v14h-3.5z"/></svg>
+      </button>
+      <button class="s-btn" id="sEnd" aria-label="Beenden" title="Beenden">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.4 5 12 10.6 17.6 5 19 6.4 13.4 12l5.6 5.6-1.4 1.4-5.6-5.6L6.4 19 5 17.6l5.6-5.6L5 6.4z"/></svg>
+      </button>
+    </div>
+    <button class="btn s-done" id="sDone" hidden>Schließen</button>
+    <p class="s-hint" id="sHint" aria-live="polite"></p>
+  </div>
+</dialog>
+
+<!-- Admin-Bereich (nur lokal): links die Phasen und Klänge als Reiter, rechts deren Einträge -->
+<dialog class="admin" id="adminDlg" aria-labelledby="admTitle">
+  <div class="adm-card">
+    <div class="adm-head">
+      <h2 id="admTitle">Sprüche und Klänge</h2>
+      <span class="adm-status" id="admStatus" role="status"></span>
+      <button class="btn sm" id="backupBtn">Frühere Stände</button>
+      <button class="btn sm primary" id="publishBtn">Für alle veröffentlichen</button>
+      <button class="btn sm" id="admClose">Fertig</button>
+    </div>
+    <!-- Roter Hinweis, wenn nicht gespeichert werden konnte bzw. ein ungespeicherter Stand im Browser liegt -->
+    <div class="adm-alert" id="admAlert" hidden role="alert">
+      <span id="admAlertText"></span>
+      <button class="btn sm" id="admAlertRestore" hidden>Wiederherstellen</button>
+      <button class="btn sm" id="admAlertDrop" hidden>Verwerfen</button>
+      <button class="btn sm" id="admAlertReload" hidden>Seite neu laden</button>
+    </div>
+    <!-- Vertonung (Inhaber): Ladebalken, solange der Helfer neue oder geänderte Sprüche aufnimmt -->
+    <div class="adm-rec" id="admRec" hidden role="status" aria-live="polite">
+      <span class="adm-rec-text" id="admRecText"></span>
+      <span class="adm-rec-bar" id="admRecBar" role="progressbar" aria-label="Fortschritt der Vertonung" aria-valuemin="0"
+        aria-valuemax="100" aria-valuenow="0"><span class="adm-rec-fill" id="admRecFill"></span></span>
+      <b class="adm-rec-pct" id="admRecPct"></b>
+      <button class="btn sm" id="admRecBtn" hidden>Jetzt vertonen</button>
+    </div>
+    <div class="adm-body">
+      <div class="adm-tabs" id="admTabs" role="tablist" aria-label="Phasen und Klänge"></div>
+      <section class="adm-panel" id="admPanel" role="tabpanel"></section>
+    </div>
+  </div>
+</dialog>
+
+<!-- Für alle veröffentlichen: erst die Änderungen zeigen, nach „Ja“ drei Schritte mit Haken -->
+<dialog class="publish" id="publishDlg" aria-labelledby="pubTitle">
+  <h2 id="pubTitle">Für alle veröffentlichen</h2>
+  <div id="pubBody"></div>
+  <ol class="pub-steps" id="pubSteps" hidden>
+    <li data-step="geprueft">Geprüft</li>
+    <li data-step="gespeichert">Gespeichert (lokal)</li>
+    <li data-step="hochgeladen">Hochgeladen zu GitHub (online)</li>
+  </ol>
+  <div class="pub-btns">
+    <button class="btn primary" id="pubYes" hidden>Ja, für alle veröffentlichen</button>
+    <button class="btn" id="pubNo">Abbrechen</button>
+  </div>
+</dialog>
+
+<!-- Frühere Stände: Sicherungen, die der Admin-Helfer bei jedem Speichern anlegt -->
+<dialog class="publish" id="backupDlg" aria-labelledby="bkTitle">
+  <h2 id="bkTitle">Frühere Stände</h2>
+  <p class="adm-hint">Bei jedem Speichern legt der Admin-Helfer den bisherigen Stand als Sicherung ab. Beim Wiederherstellen
+    wird auch der aktuelle Stand vorher gesichert, es geht also nichts verloren.</p>
+  <ul class="bk-list" id="bkList"></ul>
+  <div class="pub-btns"><button class="btn" id="bkClose">Schließen</button></div>
+</dialog>
+
+<!-- Rückfrage vor dem Löschen einer Gruppe (rot, „Abbrechen“ vorausgewählt) -->
+<dialog class="confirm" id="confirmDlg" aria-labelledby="cfTitle" aria-describedby="cfText">
+  <div class="cf-head"><span class="cf-icon" aria-hidden="true">!</span><h2 id="cfTitle"></h2></div>
+  <p id="cfText"></p>
+  <div class="cf-btns">
+    <button class="btn" id="cfCancel" autofocus>Abbrechen</button>
+    <button class="btn" id="cfKeep">Nur Gruppe auflösen, Sprüche behalten</button>
+    <button class="btn danger" id="cfDelete"></button>
+  </div>
+</dialog>
+
+<div class="toast" id="toast" role="status"><span id="toastMsg"></span><button class="link" id="toastUndo" hidden>Rückgängig</button></div>
+
+<!-- Neue Version der Offline-Kopie: erst auf Klick übernehmen, nie mitten in einer Meditation -->
+<div class="update-bar" id="updateBar" hidden role="status">
+  <span>Neue Version verfügbar.</span>
+  <button class="btn sm" id="updateReload">Neu laden</button>
+  <button class="link" id="updateLater">Später</button>
+</div>
+
+<script src="js/phasen.js?v=4a1758aa"></script>
+<script src="js/texte.js?v=fa937935"></script>
+<script src="config.js?v=101aa02f"></script>
+<script src="js/zustand.js?v=e2e4c913"></script>
+<script src="js/aufnahmen.js?v=5ee97738"></script>
+<script src="js/stimme.js?v=7ae9df3b"></script>
+<script src="js/meldungen.js?v=f4eacd6d"></script>
+<script src="js/plan.js?v=727a6b85"></script>
+<script src="js/sitzung.js?v=e2313898"></script>
+<script src="js/bedienung.js?v=7a5092f0"></script>
+<script src="js/admin.js?v=77781dc2"></script>
+<script src="js/start.js?v=bf25bd92"></script>
+</body>
+</html>
