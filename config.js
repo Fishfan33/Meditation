@@ -58,6 +58,11 @@ window.MEDITATION_CONFIG = {
     "id": "e10",
     "text": "Mit jedem Atemzug kommst du mehr bei dir an.",
     "active": true
+   },
+   {
+    "id": "ein-mux774nzhx",
+    "text": "Geräusche von außen kannst du einfach vorbeiziehen lassen. Sie bilden lediglich die Kulisse für deine wichtige Reise.",
+    "active": true
    }
   ],
   "bodyscan": [
@@ -550,6 +555,16 @@ window.MEDITATION_CONFIG = {
       "active": true
      }
     ]
+   },
+   {
+    "id": "kra-mux714r8lj",
+    "text": "Ein Vogel fliegt lautlos in großer Höhe. Er gleitet zeitlos durch die Luft.",
+    "active": true
+   },
+   {
+    "id": "kra-mux72zgj6",
+    "text": "Ich bin zu Hause, in den Bergen, die Millionen von Jahren alt sind. Und weitere Millionen Jahre werden sie hier stehen.",
+    "active": true
    }
   ],
   "unterbewusst": [
@@ -656,6 +671,16 @@ window.MEDITATION_CONFIG = {
    {
     "id": "u91",
     "text": "Diese Sätze wirken in dir weiter, auch wenn du nicht an sie denkst.",
+    "active": true
+   },
+   {
+    "id": "unt-mux740lz1",
+    "text": "Ja, es ist machbar. Ja, es ist möglich. Ja, es ist wünschenswert.",
+    "active": true
+   },
+   {
+    "id": "unt-mux75lc17y",
+    "text": "Eine Sekunde kann sich im Unterbewussten ausdehen zu Jahren, in denen du Zeit hast deine Fähigkeiten zu aktivieren.",
     "active": true
    }
   ],

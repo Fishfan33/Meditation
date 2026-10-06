@@ -46,6 +46,10 @@ self.RECORDINGS = {
   "stimme/770937938ef7.mp3",
   2.53
  ],
+ "Geräusche von außen kannst du einfach vorbeiziehen lassen. Sie bilden lediglich die Kulisse für deine wichtige Reise.": [
+  "stimme/9fda0009f39f.mp3",
+  6.69
+ ],
  "Wir wandern jetzt mit der Aufmerksamkeit durch deinen Körper.": [
   "stimme/925bf7aeaa6f.mp3",
   2.87
@@ -386,6 +390,14 @@ self.RECORDINGS = {
   "stimme/3554aa4efc46.mp3",
   6.87
  ],
+ "Ein Vogel fliegt lautlos in großer Höhe. Er gleitet zeitlos durch die Luft.": [
+  "stimme/4ca09db3465a.mp3",
+  5.54
+ ],
+ "Ich bin zu Hause, in den Bergen, die Millionen von Jahren alt sind. Und weitere Millionen Jahre werden sie hier stehen.": [
+  "stimme/05325c1c05c7.mp3",
+  8.2
+ ],
  "Du bist jetzt tief entspannt. Dein Unterbewusstsein ist offen für neue Gedanken.": [
   "stimme/7bfa36792b8a.mp3",
   5.36
@@ -469,6 +481,14 @@ self.RECORDINGS = {
  "Diese Sätze wirken in dir weiter, auch wenn du nicht an sie denkst.": [
   "stimme/96b562c4993a.mp3",
   3.4
+ ],
+ "Ja, es ist machbar. Ja, es ist möglich. Ja, es ist wünschenswert.": [
+  "stimme/b48e95ced79e.mp3",
+  6.32
+ ],
+ "Eine Sekunde kann sich im Unterbewussten ausdehen zu Jahren, in denen du Zeit hast deine Fähigkeiten zu aktivieren.": [
+  "stimme/2dee56bdb6f5.mp3",
+  6.27
  ],
  "Es ist Zeit, langsam zurückzukehren. Ich zähle von eins bis fünf.": [
   "stimme/07a9598e2822.mp3",

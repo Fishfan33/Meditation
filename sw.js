@@ -6,7 +6,7 @@
 // Ändert sich irgendeine App-Datei, ändert sich damit diese Datei: Der Browser installiert sie neu,
 // und die App bietet „Neue Version verfügbar, neu laden“ an (übernommen wird erst nach dem Klick).
 // Braucht die App eine neue Datei (Bild, Seite, Skript, Aufnahme), sie hier in FILES ergänzen.
-const VERSION = "7ed454d6";
+const VERSION = "304cbd9a";
 const CACHE = "meditation-" + VERSION;
 const FILES = [
   "./",
@@ -15,13 +15,13 @@ const FILES = [
   "js/phasen.js?v=4a1758aa",
   "js/texte.js?v=fa937935",
   "js/zustand.js?v=e2e4c913",
-  "js/aufnahmen.js?v=5ee97738",
+  "js/aufnahmen.js?v=f0c53bb6",
   "js/stimme.js?v=7ae9df3b",
   "js/meldungen.js?v=f4eacd6d",
   "js/plan.js?v=727a6b85",
   "js/sitzung.js?v=e2313898",
   "js/bedienung.js?v=7a5092f0",
-  "config.js?v=d80817af",
+  "config.js?v=b5e82352",
   "js/admin.js?v=77781dc2",
   "js/start.js?v=bf25bd92",
   "manifest.json",
@@ -42,6 +42,7 @@ const FILES = [
   "stimme/0067820eb15e.mp3",
   "stimme/008573d858b7.mp3",
   "stimme/00cd7f9a7938.mp3",
+  "stimme/05325c1c05c7.mp3",
   "stimme/054c60079b47.mp3",
   "stimme/05ce38b04748.mp3",
   "stimme/07a9598e2822.mp3",
@@ -59,6 +60,7 @@ const FILES = [
   "stimme/235b5c8660f3.mp3",
   "stimme/28ca0b7f23f1.mp3",
   "stimme/2a1fd402c139.mp3",
+  "stimme/2dee56bdb6f5.mp3",
   "stimme/2df29c4c0708.mp3",
   "stimme/2fb7f6d17c41.mp3",
   "stimme/3011078a2afd.mp3",
@@ -79,6 +81,7 @@ const FILES = [
   "stimme/4a3f8216cb00.mp3",
   "stimme/4b54cb06d619.mp3",
   "stimme/4c68a4199cb9.mp3",
+  "stimme/4ca09db3465a.mp3",
   "stimme/4d1f6299c3ee.mp3",
   "stimme/4ea1697b884b.mp3",
   "stimme/4ed7c504901b.mp3",
@@ -126,6 +129,7 @@ const FILES = [
   "stimme/97c949fa0ccd.mp3",
   "stimme/9cc39be7a1fb.mp3",
   "stimme/9f9a35548d40.mp3",
+  "stimme/9fda0009f39f.mp3",
   "stimme/a0167008ccd1.mp3",
   "stimme/a0d4dee9b0ce.mp3",
   "stimme/a1b7dbb6bba8.mp3",
@@ -137,6 +141,7 @@ const FILES = [
   "stimme/b0a605609345.mp3",
   "stimme/b183c8dd1519.mp3",
   "stimme/b258f9fcfb17.mp3",
+  "stimme/b48e95ced79e.mp3",
   "stimme/b6bcc213cc56.mp3",
   "stimme/ba1782cb0eba.mp3",
   "stimme/ba933be4b493.mp3",
