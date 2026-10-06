@@ -109,8 +109,13 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
 - Web-App, die sich aufs Handy legen lässt und offline läuft; keine App-Store-App (bräuchte einen Mac) (Inhaber, Oktober 2026).
 - **Speichert vorerst nichts** (Inhaber, Oktober 2026). Vielleicht später; dann nur im Browser des Geräts, Datenschutzseite
   ergänzen und alles Geladene prüfen (siehe „Daten und Datenschutz“).
-- Veröffentlichung über GitHub Pages, Konto **Fishfan33** (Inhaber, Oktober 2026). Das Projekt auf GitHub ist noch nicht
-  angelegt; Name klären, sobald die App einen hat.
+- **Veröffentlicht** (6. Oktober 2026): öffentliches Projekt https://github.com/Fishfan33/Meditation, Seite
+  https://fishfan33.github.io/Meditation/ (GitHub Pages aus main, HTTPS erzwungen). Ein privates Projekt mit Pages ginge
+  nur mit bezahltem Konto. Einstellungen: Regelsatz „main schützen“ (nicht löschen, kein Überschreiben der Geschichte;
+  direktes Hochladen auf main bleibt für den Admin-Helfer möglich), Secret Scanning und Push Protection an, Wiki aus,
+  gemergte Arbeitskopien werden gelöscht. Actions bleiben an: GitHub Pages braucht sie zum Veröffentlichen.
+  Erstes Hochladen als neue Geschichte mit einem Stand; die alte Geschichte liegt nur lokal in `geschichte-lokal`
+  (nie hochladen, enthält den Vornamen in Commit-Nachrichten).
 
 ## Offen (Stand 5. Oktober 2026)
 
@@ -129,13 +134,9 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
 - **Audit (Inhaber, Oktober 2026):** Wenn der Aufbau fertig ist und vor den Texten ein umfassendes Audit der
   Meditations-App über alle Bereiche aus `~/.claude/CLAUDE.md` („Audits“), mit Bericht; danach das Retro-Cockpit.
 - Automatische Tests (`werkzeuge/tests.py` nach Vorlage des Retro-Cockpits) fehlen noch.
-- GitHub-Projekt anlegen (Name klären) und GitHub Pages einschalten, nur nach OK des Inhabers.
 - **Security-Audit (Oktober 2026), vor dem ersten Hochladen:** behoben: Helfer liefert nur der eigenen Seite aus (Host
   geprüft, keine versteckten Ordner wie `.git`, keine Ordnerlisten), Datenschutzseite auf die Aufnahmen angepasst, keine
-  persönlichen Angaben in Projektdateien („der Inhaber“). **Noch offen:** Die bisherigen Commit-Nachrichten enthalten den
-  Vornamen: Das erste Hochladen deshalb als **neue Geschichte mit einem einzigen Stand** (ohne die lokalen Commits),
-  danach nur neutrale Nachrichten. Beim Anlegen auf GitHub: HTTPS erzwingen, main schützen, Secret Scanning und Push
-  Protection an, Actions aus.
+  persönlichen Angaben in Projektdateien („der Inhaber“); erstes Hochladen als neue Geschichte (siehe oben).
 
 ## Erkenntnisse aus dem Retro-Cockpit
 

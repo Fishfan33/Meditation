@@ -405,7 +405,7 @@ def unterschiede(alt, neu, grund):
         innen_n = [i for i, _ in n.items() if i in a]
         if reihe_a != reihe_n or innen_a != innen_n:
             zeilen.append(f"{P}: Reihenfolge geändert")
-    alt_pause = (alt.get("settings") or {}).get("pause", 1.1 if alt.get("version") else 2)
+    alt_pause = (alt.get("settings") or {}).get("pause", 2)   # ohne Angabe gilt der Standard der App (2,0 s)
     if alt_pause != neu["settings"]["pause"]:
         zeilen.append(f"Sprechpause: {str(alt_pause).replace('.', ',')} s → {str(neu['settings']['pause']).replace('.', ',')} s")
     for k in KLAENGE:
