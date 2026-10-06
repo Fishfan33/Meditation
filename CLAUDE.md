@@ -80,6 +80,9 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
   - **Sätze nacheinander mit einstellbarer Sprechpause** (Inhaber, 6. Oktober 2026): zuerst 1,1 s, dann „etwas länger“,
     Standard jetzt 2,0 s, im Admin-Bereich unter „Einstellungen“ 0,5–10 s in Zehntelsekunden (`settings.pause` in
     config.js, geprüft in `cleanSettings` und im Helfer); ist der Text einer Phase durch, geht es von vorn los.
+    **Die Pause gilt auch zwischen den Sätzen innerhalb eines Spruchs** (Inhaber): `aufnahmen.py` nimmt jeden Satz einzeln
+    auf (`saetze()`), `js/aufnahmen.js` hat je Spruch `[[Datei, Sek], …]`, `speak()` legt die Sätze mit `settings.pause`
+    dazwischen auf die Ton-Zeitachse. Eine geänderte Pause wirkt sofort, ohne neue Aufnahmen.
   - **Zeitende einer Phase (Inhaber):** Ein Satz darf anfangen, solange die Phase läuft, und wird zu Ende gesprochen;
     danach kein neuer. Es ist in Ordnung, wenn kurze Phasen nicht alle Sätze schaffen. Läuft der letzte Satz über das
     Ende, beginnt die nächste Phase erst danach (nie zwei Sätze übereinander).

@@ -383,7 +383,8 @@ function soundsMarkup() {
 const fmtSec = v => `${v.toFixed(1).replace(".", ",")} s`;
 function settingsMarkup() {
   return `<h3 class="adm-set-title">Pause zwischen den Sätzen</h3>
-    <p class="adm-hint">So lange ist es still, bevor der nächste Satz beginnt. Gilt in der Meditation und beim Anhören.</p>
+    <p class="adm-hint">So lange ist es still, bevor der nächste Satz beginnt: zwischen zwei Sprüchen und ebenso zwischen den
+      Sätzen innerhalb eines Spruchs. Gilt in der Meditation und beim Anhören; neu aufnehmen ist dafür nicht nötig.</p>
     <div class="adm-set-row">
       <input type="range" id="setPause" min="${PAUSE_MIN}" max="${PAUSE_MAX}" step="0.1" value="${settings.pause}" aria-label="Pause zwischen den Sätzen in Sekunden">
       <label class="adm-set-num"><input type="number" id="setPauseNum" min="${PAUSE_MIN}" max="${PAUSE_MAX}" step="0.1" value="${settings.pause}"
@@ -412,7 +413,10 @@ admPanel.addEventListener("input", e => {
 admPanel.addEventListener("change", e => { if (e.target.id === "setPauseNum") setPause(e.target.value, true); });
 admPanel.addEventListener("click", e => {
   if (e.target.closest("#setPauseTry")) {
-    const lines = spokenSayings(PHASES[0].id).slice(0, 2).map(s => s.text);
+    // Ein Spruch mit mehreren Sätzen und der nächste: so hört man beide Arten von Pause
+    const all = PHASES.flatMap(p => spokenSayings(p.id)).map(s => s.text);
+    const k = Math.max(0, all.findIndex(t => (recordingOf(t)?.length || 0) > 1));
+    const lines = all.slice(k, k + 2);
     stopGroup(); audioUnlock(); stopSpeaking();
     const run = ++groupRun;
     speak(lines[0], () => setTimeout(() => { if (run === groupRun) speak(lines[1]); }, settings.pause * 1000));

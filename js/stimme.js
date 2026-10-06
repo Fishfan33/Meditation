@@ -22,33 +22,47 @@ function chooseVoice() {
 }
 
 // ---------- Aufnahmen ----------
-const recordingOf = text => self.RECORDINGS?.[text] || null;
+// Je Spruch seine Sätze als einzelne Aufnahmen [[Datei, Sekunden], …]; zwischen den Sätzen liegt dieselbe Pause wie
+// zwischen den Sprüchen (settings.pause, im Admin-Bereich einstellbar: eine Einstellung für alle Pausen).
+// Ältere Listen hatten je Spruch nur [Datei, Sekunden]; das wird hier in die neue Form gebracht.
+const recordingOf = text => {
+  const r = self.RECORDINGS?.[text];
+  return !r ? null : typeof r[0] === "string" ? [r] : r;
+};
 const voiceBuffers = new Map();   // Datei → dekodierter Ton (einmal laden, dann aus dem Speicher)
-function loadRecording(text) {
-  const rec = recordingOf(text);
-  if (!rec || !audioCtx) return Promise.resolve(null);
-  if (!voiceBuffers.has(rec[0])) {
-    voiceBuffers.set(rec[0], fetch(rec[0]).then(r => r.arrayBuffer()).then(b => audioCtx.decodeAudioData(b)).catch(() => null));
+function loadFile(file) {
+  if (!voiceBuffers.has(file)) {
+    voiceBuffers.set(file, fetch(file).then(r => r.arrayBuffer()).then(b => audioCtx.decodeAudioData(b)).catch(() => null));
   }
-  return voiceBuffers.get(rec[0]);
+  return voiceBuffers.get(file);
+}
+function loadRecording(text) {
+  const parts = recordingOf(text);
+  if (!parts || !audioCtx) return Promise.resolve(null);
+  return Promise.all(parts.map(([file]) => loadFile(file))).then(bufs => bufs.every(Boolean) ? bufs : null);
 }
 // Vorab laden, z. B. alle Sätze einer Meditation, während der Gong klingt
 const preloadRecordings = texts => texts.forEach(loadRecording);
-let voiceSource = null, speakToken = 0;
+let voiceSources = [], speakToken = 0;
 
-// Satz vorlesen; `done` läuft, wenn er fertig ist (oder abgebrochen wurde)
+// Spruch vorlesen; `done` läuft, wenn er fertig ist (oder abgebrochen wurde). Die Sätze werden auf der Zeitachse des
+// Tons genau hintereinander gelegt, jeweils mit der eingestellten Pause dazwischen.
 function speak(text, done) {
   const token = ++speakToken;
   if (recordingOf(text) && audioCtx) {
-    loadRecording(text).then(buf => {
-      if (token !== speakToken) return;   // inzwischen abgebrochen oder ein anderer Satz
-      if (!buf) { speakSynth(text, done); return; }
-      const src = audioCtx.createBufferSource();
-      src.buffer = buf;
-      src.connect(audioCtx.destination);
-      src.onended = () => { if (voiceSource === src) voiceSource = null; done?.(); };
-      voiceSource = src;
-      src.start();
+    loadRecording(text).then(bufs => {
+      if (token !== speakToken) return;   // inzwischen abgebrochen oder ein anderer Spruch
+      if (!bufs) { speakSynth(text, done); return; }
+      let t = audioCtx.currentTime + .02;
+      voiceSources = bufs.map((buf, k) => {
+        const src = audioCtx.createBufferSource();
+        src.buffer = buf;
+        src.connect(audioCtx.destination);
+        src.start(t);
+        t += buf.duration + settings.pause;
+        if (k === bufs.length - 1) src.onended = () => { if (voiceSources.includes(src)) voiceSources = []; done?.(); };
+        return src;
+      });
     });
     return;
   }
@@ -66,12 +80,17 @@ function speakSynth(text, done) {
 }
 function stopSpeaking() {
   speakToken++;
-  if (voiceSource) { const s = voiceSource; voiceSource = null; s.onended = null; try { s.stop(); } catch {} }
+  const srcs = voiceSources;
+  voiceSources = [];
+  srcs.forEach(src => { src.onended = null; try { src.stop(); } catch {} });
   synth?.cancel();
 }
 
-// Sprechdauer in Sekunden: genau aus der Aufnahme, sonst geschätzt (Browser-Stimme)
-const speechSeconds = text => recordingOf(text)?.[1] ?? text.length / 12.5 + .6;
+// Sprechdauer eines Spruchs in Sekunden: seine Sätze plus die Pausen dazwischen; ohne Aufnahme geschätzt
+function speechSeconds(text) {
+  const parts = recordingOf(text);
+  return parts ? parts.reduce((a, [, sek]) => a + sek, 0) + (parts.length - 1) * settings.pause : text.length / 12.5 + .6;
+}
 
 // ---------- Ton (Web Audio) ----------
 // Erst nach einem Tipp erlaubt (Browser spielen sonst nichts ab): audioUnlock() beim Starten aufrufen.
