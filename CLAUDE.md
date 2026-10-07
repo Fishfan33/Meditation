@@ -182,7 +182,9 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
 - **Vorlage tauschen:** Der Zwischenspeicher erkennt eine Stimme an ihrem Eintrag in `stimmen.json` (Dateiname der
   Vorlage), nicht am Inhalt der WAV-Datei. Eine neue Vorlage deshalb immer unter neuem Namen und als neuen Eintrag
   anlegen (z. B. `karlsson-echt`), nie `karlsson.wav` überschreiben, sonst gelten alte Rohaufnahmen weiter.
-  Echte Karlsson-Ausschnitte (M-AILABS, LibriVox) zum Anhören: `hoerproben/karlsson-vorlagen/` (Inhaber wählt).
+  **Vorlage A bleibt (Inhaber, 7. Oktober 2026):** Im Hörvergleich (`hoerproben/vergleich-karlsson/`, einzelne Sätze und
+  ein 30-s-Abschnitt) klang die bisherige, mit Piper erzeugte Vorlage natürlicher als ein echter Karlsson-Ausschnitt
+  (Nr. 81, „Der Sandmann“, M-AILABS/LibriVox): Hörbuch-Betonung und Raumklang der echten Aufnahme übertragen sich.
 - **Chatterbox auf diesem Rechner (gemessen 7. Oktober 2026):** Laden ~2 Min., 50–80 s je Satz (4 Rechenkerne, Standard),
   **~5 GB Arbeitsspeicher** bei 7,5 GB im Rechner. Läuft die Claude-App gleichzeitig, beendet der Speicher-Notfallschutz
   Prozesse (so zweimal am 7. Oktober 2026). Lange Vertonungen deshalb ohne Claude-App und ohne Browser laufen lassen.
