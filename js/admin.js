@@ -157,10 +157,10 @@ function withUndo(msg, action, opts) {
 }
 
 // ---------- Vertonung (Ladebalken) ----------
-// Nach jedem Speichern nimmt der Admin-Helfer neue oder geänderte Sprüche mit Thorstens Stimme auf (Inhaber). Solange
+// Nach jedem Speichern nimmt der Admin-Helfer neue oder geänderte Sprüche mit der gewählten Stimme auf (Inhaber). Solange
 // das läuft, fragt der Admin-Bereich jede Sekunde nach dem Fortschritt; danach lädt er die Liste der Aufnahmen
 // neu (genaue Dauer, Wiedergabe der Aufnahme statt der Browser-Stimme).
-let recState = { laeuft: false, fertig: 0, gesamt: 0, aktuell: "", fehler: "", stand: 0 };
+let recState = { laeuft: false, fertig: 0, gesamt: 0, aktuell: "", fehler: "", stand: 0, rest: null, stimme: "" };
 let recTimer = null, recSeen = null;
 const recCall = path => fetch(path, { method: "POST", headers: { "Content-Type": "application/json", "X-Meditation": "1" },
   body: "{}" }).then(r => r.json());
@@ -189,10 +189,15 @@ function paintRecording() {
     pct.textContent = `${p} %`;
     const n = recState.gesamt, k = Math.min(recState.fertig + 1, n);
     const satz = recState.aktuell ? ` „${recState.aktuell.slice(0, 40)}${recState.aktuell.length > 40 ? " …" : ""}“` : "";
-    text.textContent = (recState.schritt || "").startsWith("Satz") && n
-      ? `Vertonung: Satz ${k} von ${n} wird ${recState.schritt.endsWith("gesprochen") ? "gesprochen" : "umgewandelt"}${satz}`
+    // Mit Restzeit (Inhaber: nicht lange auf das Ende warten müssen, ohne zu wissen, wie lange)
+    const rest = recState.rest ? ` · noch ${fmtWait(recState.rest)}` : "";
+    const wer = recState.stimme ? ` (${recState.stimme})` : "";
+    text.textContent = recState.schritt === "Satz wird gesprochen" && n
+      ? `Vertonung${wer}: Satz ${k} von ${n} wird gesprochen${satz}${rest}`
+      : recState.schritt === "Sätze werden umgewandelt" && n
+      ? `Vertonung${wer}: Sätze werden umgewandelt, ${Math.min(recState.fertig, n)} von ${n}${rest}`
       : recState.schritt === "Fertig" ? "Vertonung fertig ✓"
-      : `Vertonung: ${(recState.schritt || "läuft").replace(/^Vertonung /, "")} …`;
+      : `Vertonung${wer}: ${(recState.schritt || "läuft").replace(/^Vertonung /, "")} …${rest}`;
   } else if (recState.fehler) text.textContent = `Vertonung nicht möglich: ${recState.fehler}`;
   else text.textContent = missing ? `${missing === 1 ? "Ein Spruch ist" : `${missing} Sprüche sind`} noch nicht vertont.` : "";
 }
@@ -378,11 +383,82 @@ function soundsMarkup() {
 }
 
 // ---------- Einstellungen ----------
-// Sprechpause zwischen zwei Sätzen (Inhaber): in Sekunden mit einer Nachkommastelle, wie bei Audio- und
-// Meditations-Apps üblich; Regler und Zahlenfeld, „Probe hören“ liest zwei Sätze mit dieser Pause.
+// Stimm-Einstellungen (Inhaber, Oktober 2026): Stimme (Programm und Sprecher aus werkzeuge/stimmen.json, mit Hörprobe),
+// Sprechtempo und Pause. Möglichst ohne Warten: Die Pause setzt die App beim Abspielen ein, das Tempo rechnet der Helfer
+// aus den zwischengespeicherten Aufnahmen um (etwa eine Minute), nur eine neue Stimme muss alle Sätze einmal sprechen.
+// Sprechpause zwischen zwei Sätzen: in Sekunden mit einer Nachkommastelle, wie bei Audio- und Meditations-Apps
+// üblich; Regler und Zahlenfeld, „Probe hören“ liest zwei Sätze mit dieser Pause.
 const fmtSec = v => `${v.toFixed(1).replace(".", ",")} s`;
+const fmtWait = sec => sec < 90 ? "etwa eine Minute" : sec < 3600 ? `etwa ${Math.round(sec / 60)} Minuten`
+  : `etwa ${Math.floor(sec / 3600)} Std. ${Math.round(sec % 3600 / 60)} Min.`;
+let voiceCatalog = null, voiceProg = null, probeAudio = null;
+const currentVoice = () => settings.stimme || VOICE_DEFAULT;
+async function loadVoices() {
+  try {
+    const r = await recCall("api/stimmen");
+    voiceCatalog = r.ok ? r : { fehler: r.fehler };
+  } catch { voiceCatalog = { fehler: "Der Admin-Helfer antwortet nicht." }; }
+  if (admTab === "einst" && adminDlg.open) renderAdmin();
+}
+function stopProbe() {
+  if (probeAudio) { probeAudio.pause(); probeAudio = null; }
+  document.querySelectorAll("[data-probe].playing").forEach(b => { b.classList.remove("playing"); b.textContent = "▶"; });
+}
+// Hörprobe der Stimme, im gewählten Tempo (der Browser hält die Tonhöhe, wie später die Aufnahmen)
+function playProbe(src, btn) {
+  const again = btn?.classList.contains("playing");
+  stopProbe(); stopGroup(); stopSpeaking();
+  if (again || !src) return;
+  probeAudio = new Audio(src);
+  probeAudio.preservesPitch = true;
+  probeAudio.playbackRate = currentVoice().tempo;
+  probeAudio.onended = stopProbe;
+  probeAudio.play().catch(stopProbe);
+  if (btn) { btn.classList.add("playing"); btn.textContent = "■"; }
+}
+function voiceMarkup() {
+  if (!voiceCatalog) {
+    if (voiceCatalog === null) { voiceCatalog = false; loadVoices(); }
+    return `<p class="adm-hint">Stimmen werden geladen …</p>`;
+  }
+  if (voiceCatalog.fehler) {   // beim nächsten Öffnen neu versuchen
+    const msg = voiceCatalog.fehler;
+    voiceCatalog = null;
+    return `<p class="adm-hint">Stimmen nicht verfügbar: ${esc(msg)}</p>`;
+  }
+  const cur = currentVoice();
+  const progs = voiceCatalog.programme.filter(p => p.eingerichtet);
+  const prog = progs.find(p => p.id === (voiceProg || cur.programm)) || progs[0];
+  if (!prog) return `<p class="adm-hint">Kein Sprachprogramm eingerichtet.</p>`;
+  const n = voiceCatalog.saetze;
+  return `${progs.length > 1 ? `<div class="adm-seg" role="tablist" aria-label="Sprachprogramm">${progs.map(p => `
+      <button class="adm-seg-btn${p.id === prog.id ? " on" : ""}" role="tab" aria-selected="${p.id === prog.id}"
+        data-act="voice-prog" data-prog="${p.id}">${esc(p.name)}</button>`).join("")}</div>` : ""}
+    <ul class="adm-list adm-voices">${prog.stimmen.map(v => {
+      const on = cur.programm === prog.id && cur.stimme === v.id;
+      return `<li class="adm-row${on ? " chosen" : ""}">
+        <button class="adm-icon" data-probe="${esc(v.probe || "")}"${v.probe ? "" : " disabled"}
+          aria-label="Hörprobe ${esc(v.name)}" title="Hörprobe">▶</button>
+        <span class="adm-text">${esc(v.name)}</span>
+        <span class="adm-actions">${on ? `<span class="adm-chosen">✓ Gewählt</span>`
+          : `<button class="btn sm" data-act="voice-pick" data-prog="${prog.id}" data-voice="${v.id}">Wählen</button>`}</span></li>`;
+    }).join("")}</ul>
+    <p class="adm-hint">Eine neue Stimme spricht alle ${n || ""} Sätze einmal: mit ${esc(prog.name)} ${fmtWait(prog.sekundenJeSatz * (n || 200))}.
+      So lange liest die bisherige Stimme weiter. Zurück zu einer schon benutzten Stimme geht schnell.</p>`;
+}
 function settingsMarkup() {
-  return `<h3 class="adm-set-title">Pause zwischen den Sätzen</h3>
+  const tempo = Math.round(currentVoice().tempo * 100);
+  return `<h3 class="adm-set-title">Stimme</h3>
+    ${voiceMarkup()}
+    <h3 class="adm-set-title">Sprechtempo</h3>
+    <p class="adm-hint">Wie schnell die Stimme spricht; 100 % wie aufgenommen. Die Tonhöhe bleibt gleich. Die Aufnahmen werden
+      danach in etwa einer Minute umgerechnet, neu sprechen ist nicht nötig.</p>
+    <div class="adm-set-row">
+      <input type="range" id="setTempo" min="${TEMPO_MIN * 100}" max="${TEMPO_MAX * 100}" step="5" value="${tempo}" aria-label="Sprechtempo in Prozent">
+      <output class="adm-set-out" id="setTempoOut">${tempo} %</output>
+      <button class="btn sm" id="setTempoTry">▶ Probe hören</button>
+    </div>
+    <h3 class="adm-set-title">Pause zwischen den Sätzen</h3>
     <p class="adm-hint">So lange ist es still, bevor der nächste Satz beginnt: zwischen zwei Sprüchen und ebenso zwischen den
       Sätzen innerhalb eines Spruchs. Gilt in der Meditation und beim Anhören; neu aufnehmen ist dafür nicht nötig.</p>
     <div class="adm-set-row">
@@ -392,6 +468,31 @@ function settingsMarkup() {
       <button class="btn sm" id="setPauseTry">▶ Probe hören</button>
     </div>
     <p class="adm-hint">Standard: ${fmtSec(PAUSE_DEFAULT)}. Bereich ${fmtSec(PAUSE_MIN)} bis ${fmtSec(PAUSE_MAX)}.</p>`;
+}
+const voiceName = v => {
+  const p = voiceCatalog?.programme.find(p => p.id === v.programm);
+  return `${p?.name || v.programm} „${p?.stimmen.find(s => s.id === v.stimme)?.name || v.stimme}“`;
+};
+function pickVoice(programm, stimme) {
+  stopProbe();
+  const prog = voiceCatalog.programme.find(p => p.id === programm);
+  const wait = fmtWait(prog.sekundenJeSatz * (voiceCatalog.saetze || 200));
+  withUndo(`Stimme gewechselt: ${voiceName({ programm, stimme })}. Die Sätze werden jetzt neu gesprochen (${wait}, oder schneller, ` +
+    `wenn es sie schon gab); bis dahin liest die bisherige Stimme.`, () => {
+    settings.stimme = cleanVoice({ ...currentVoice(), programm, stimme });
+  }, { long: true });
+}
+let tempoSaveTimer;
+function setTempo(v) {
+  const t = cleanVoice({ ...VOICE_DEFAULT, ...currentVoice(), tempo: Number(v) / 100 });
+  const tempo = (t || VOICE_DEFAULT).tempo;
+  document.getElementById("setTempoOut").textContent = `${Math.round(tempo * 100)} %`;
+  if (probeAudio) probeAudio.playbackRate = tempo;
+  if (tempo === currentVoice().tempo) return;
+  settings.stimme = t;
+  // Wie bei der Pause: erst kurz nach dem Loslassen speichern, dann rechnet der Helfer die Aufnahmen um
+  clearTimeout(tempoSaveTimer);
+  tempoSaveTimer = setTimeout(() => { keepDraft(); scheduleSave(); }, 800);
 }
 let pauseSaveTimer;
 function setPause(v, final) {
@@ -409,9 +510,20 @@ function setPause(v, final) {
 }
 admPanel.addEventListener("input", e => {
   if (e.target.id === "setPause") { setPause(e.target.value); document.getElementById("setPauseNum").value = settings.pause; }
+  if (e.target.id === "setTempo") setTempo(e.target.value);
 });
 admPanel.addEventListener("change", e => { if (e.target.id === "setPauseNum") setPause(e.target.value, true); });
 admPanel.addEventListener("click", e => {
+  const probe = e.target.closest("[data-probe]");
+  if (probe) playProbe(probe.dataset.probe, probe);
+  const act = e.target.closest("[data-act]");
+  if (act?.dataset.act === "voice-prog") { stopProbe(); voiceProg = act.dataset.prog; renderAdmin(); }
+  if (act?.dataset.act === "voice-pick") pickVoice(act.dataset.prog, act.dataset.voice);
+  if (e.target.closest("#setTempoTry")) {
+    const cur = currentVoice();
+    const v = voiceCatalog?.programme.find(p => p.id === cur.programm)?.stimmen.find(s => s.id === cur.stimme);
+    playProbe(v?.probe, null);
+  }
   if (e.target.closest("#setPauseTry")) {
     // Ein Spruch mit mehreren Sätzen und der nächste: so hört man beide Arten von Pause
     const all = PHASES.flatMap(p => spokenSayings(p.id)).map(s => s.text);

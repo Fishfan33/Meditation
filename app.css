@@ -386,6 +386,17 @@ body.adm-dragging { cursor: grabbing; user-select: none; -webkit-user-select: no
 .adm-set-row input[type="range"] { flex: 1 1 220px; accent-color: var(--accent); height: 32px; }
 .adm-set-num { display: inline-flex; align-items: center; gap: 4px; }
 .adm-set-num input { width: 70px; font: inherit; font-size: 16px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); text-align: right; }
+/* Stimme: Programm als Umschalter, Stimmen als Zeilen mit Hörprobe und „Wählen“ */
+.adm-seg { display: inline-flex; flex-wrap: wrap; gap: 4px; margin: 8px 0 10px; padding: 4px; border-radius: 12px; background: var(--accent-soft); }
+.adm-seg-btn { min-height: 44px; padding: 6px 16px; border: 0; border-radius: 9px; background: transparent; color: var(--text); font: inherit; font-size: 15px; cursor: pointer; }
+.adm-seg-btn.on { background: var(--surface); font-weight: 700; font-synthesis: none; }
+.adm-list.adm-voices .adm-row { grid-template-columns: 40px minmax(0, 1fr) auto; }
+.adm-voices .adm-row.chosen { border-color: var(--accent); border-width: 1.5px; }
+.adm-chosen { padding: 0 10px; color: var(--accent); font-weight: 700; font-synthesis: none; font-size: 14px; }
+.adm-icon.playing { background: var(--accent); color: var(--on-accent); }
+.adm-icon:disabled { opacity: .35; cursor: default; }
+.adm-set-out { min-width: 4em; font-variant-numeric: tabular-nums; font-size: 16px; }
+.adm-voices + .adm-hint { margin-top: 8px; }
 /* Gruppen als Karten (Wahl B des Inhabers): Kopf mit Griff, Auf-/Zuklappen, Name, Zahl und Dauer, Schalter, Umbenennen, Auflösen */
 .adm-group { list-style: none; border: 1.5px solid var(--border); border-radius: 14px; background: color-mix(in srgb, var(--accent) 5%, var(--surface)); padding: 4px 6px 6px; }
 .adm-group.dragging { position: relative; z-index: 2; border-color: var(--accent); box-shadow: 0 10px 24px rgba(60, 40, 20, .18); }

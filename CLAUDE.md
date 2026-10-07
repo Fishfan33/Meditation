@@ -45,8 +45,9 @@ Reines HTML/CSS/JS wie im Retro-Cockpit. Klassische Skripte in `js/`, Reihenfolg
   `git push origin HEAD:main`. Ohne GitHub-Verbindung (noch kein `origin`) sagt er das verständlich.
   **Sicherungen:** vor jedem Speichern legt er den bisherigen Stand von config.js mit Uhrzeit in
   `~/.local/share/meditation-app/sicherungen/` ab (500 Stück); im Admin-Bereich „Frühere Stände“ zum Wiederherstellen.
-  **Automatische Vertonung (Inhaber):** nach jedem Speichern im Hintergrund `aufnahmen.py` (Piper, nur fehlende Sätze, Sperre
-  gegen zwei gleichzeitige Läufe); `/api/aufnahme-status` für den Ladebalken; „Für alle veröffentlichen“ nimmt
+  **Automatische Vertonung (Inhaber):** nach jedem Speichern im Hintergrund `aufnahmen.py` (gewählte Stimme, nur fehlende
+  Sätze, Sperre gegen zwei gleichzeitige Läufe); `/api/aufnahme-status` für den Ladebalken mit Restzeit; wechseln Stimme oder
+  Tempo während einer Vertonung, bricht er sie ab (Prozessgruppe) und beginnt neu; `/api/stimmen` für die Stimmenwahl; „Für alle veröffentlichen“ nimmt
   `stimme/`, `js/aufnahmen.js` und die Liste in `sw.js` mit. Optionen `--port`, `--kopie`, `--sicherungen` für Tests.
   **Vorsicht:** Der Helfer des Retro-Cockpits heißt genauso (`admin_helfer.py`); Prozesse nur über ihren Ordner
   (`/proc/<pid>/cwd`) unterscheiden, nie per `pkill -f admin_helfer`. Schutz wie im Retro-Cockpit: Host/Origin
@@ -140,6 +141,29 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
 - **Security-Audit (Oktober 2026), vor dem ersten Hochladen:** behoben: Helfer liefert nur der eigenen Seite aus (Host
   geprüft, keine versteckten Ordner wie `.git`, keine Ordnerlisten), Datenschutzseite auf die Aufnahmen angepasst, keine
   persönlichen Angaben in Projektdateien („der Inhaber“); erstes Hochladen als neue Geschichte (siehe oben).
+
+## Stimmen (Stand 7. Oktober 2026)
+
+- **Mehrere Sprachprogramme** (Wunsch des Inhabers: am Ende nur noch Programm und eine von etwa fünf Stimmen wählen, danach
+  soll es direkt funktionieren): `werkzeuge/stimmen.json` (Katalog: Programme Piper, XTTS-v2, Chatterbox mit je fünf
+  Stimmen, Ordner unter `~/.local/share/`, Hörprobe), `werkzeuge/sprecher.py` (läuft in der Python-Umgebung des Programms,
+  spricht Satz für Satz als WAV, offline: `HF_HUB_OFFLINE=1`), `werkzeuge/aufnahmen.py` (System-Python: liest Texte und
+  `settings.stimme`, Rohaufnahmen-Zwischenspeicher `~/.local/share/meditation-app/rohaufnahmen/<programm>-<stimme>/`,
+  daraus MP3 mit Tempo per Rubber Band, tonhöhenerhaltend; Liste erst am Ende ausgetauscht, bis dahin die alte Stimme).
+  Piper Thorsten bei 100 % behält die alten Dateinamen (keine neuen Aufnahmen nötig).
+- Wahl im Admin-Bereich unter „Einstellungen“ (Variante A „im Admin-Bereich“, Claudes Empfehlung, mit dem Inhaber noch nicht
+  entschieden): Programm-Umschalter, Stimmen mit Hörprobe und „Wählen“ (mit Rückgängig), Sprechtempo 80–120 %, Pause.
+  `config.js` `settings.stimme = {programm, stimme, tempo}` (fehlt = Standard), geprüft in `cleanVoice` und im Helfer.
+- Wartezeiten: Pause sofort; Tempo etwa 1–2 Min. (umrechnen); neue Stimme einmal alle Sätze: Piper ~3 Min., XTTS ~30 s und
+  Chatterbox ~60 s je Satz auf diesem Rechner; zurück zu einer benutzten Stimme schnell.
+- Entscheidungsvorlage mit allen Hörproben: `hoerproben/entscheidung/index.html` (lokal, von Git ausgenommen).
+  **Nach der Wahl des Inhabers:** das andere Programm löschen (Ordner `~/.local/share/meditation-xtts` bzw.
+  `meditation-chatterbox`, seine Hörproben, Rohaufnahmen und Einträge in `stimmen.json`), `~/.pkuseg` gehört zu Chatterbox.
+  Bei MLS-Stimmen (CC BY 4.0) Namensnennung in `datenschutz.html`; Herkunft in `stimme/QUELLE.md`.
+- Sicherheit: nur Stimmen, die für Sprachsynthese freigegeben sind (Thorsten CC0, Karlsson M-AILABS, MLS CC BY 4.0,
+  XTTS-Studiostimmen), keine Stimmen realer Privatpersonen nachgeahmt. Modelle mit geprüften Prüfsummen, geladen mit
+  `weights_only`/safetensors. Chatterbox lud beim ersten Start `spacy_ontonotes.zip` (Explosion/spaCy auf GitHub,
+  SHA-256 b216e7f9…, nur msgpack und npz ohne Pickle) nach `~/.pkuseg`. XTTS-v2: Lizenz nur nicht-kommerziell (CPML).
 
 ## Weiter am nächsten Tag (Stand 6. Oktober 2026, abends)
 

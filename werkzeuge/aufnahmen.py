@@ -1,19 +1,24 @@
 #!/usr/bin/env python3
-"""Nimmt alle Sätze aus js/texte.js mit der gewählten Stimme auf (Piper, offline auf Rechner des Inhabers).
+"""Nimmt alle Sätze der App mit der gewählten Stimme auf (offline auf dem Rechner des Inhabers).
 
-    ~/.local/share/meditation-stimme/venv/bin/python werkzeuge/aufnahmen.py
+    python3 werkzeuge/aufnahmen.py
 
-Stimme: Thorsten (de_DE-thorsten-high), etwas langsamer (Wahl des Inhabers „A2“, Oktober 2026). Piper und die Stimme
-liegen außerhalb des Projekts in ~/.local/share/meditation-stimme (Herkunft und Prüfsummen: stimme/QUELLE.md).
+Stimme: im Admin-Bereich unter „Einstellungen“ gewählt (config.js settings.stimme: Programm, Stimme, Tempo); ohne
+Angabe Piper „Thorsten“, etwas langsamer (Wahl des Inhabers „A2“, Oktober 2026). Die Programme und Stimmen stehen in
+werkzeuge/stimmen.json, gesprochen wird mit werkzeuge/sprecher.py in der Python-Umgebung des Programms.
 
-Ablauf:
+Ablauf (so schnell wie möglich, Wunsch des Inhabers):
 - Die Sätze kommen aus der App selbst: Chromium lädt phasen.js, texte.js, config.js und zustand.js und gibt
-  alle Sprüche aus (Fassung des Inhabers aus dem Admin-Bereich, auch deaktivierte).
-- Jeder Satz wird einmal aufgenommen, Lautstärke angeglichen, Stille am Anfang und Ende entfernt,
-  als MP3 nach stimme/<prüfsumme>.mp3. Der Dateiname hängt an Text und Stimm-Einstellungen: Gleicher Satz,
-  gleiche Datei; geänderter Satz, neue Datei. Schon vorhandene Aufnahmen werden nicht neu erzeugt.
-- Aufnahmen, die zu keinem Satz mehr gehören, werden gelöscht.
-- js/aufnahmen.js bekommt die Liste (Satz → Datei und Länge in Sekunden), sw.js die Dateien für die Offline-Kopie.
+  alle Sprüche und die Einstellungen aus (Fassung des Inhabers aus dem Admin-Bereich, auch deaktivierte Sprüche).
+- Jeder Satz wird einmal gesprochen und als Rohaufnahme zwischengespeichert (~/.local/share/meditation-app/
+  rohaufnahmen/<programm>-<stimme>/). Neu gesprochen wird nur, was es für diese Stimme noch nicht gibt: ein neuer
+  oder geänderter Satz, oder eine Stimme, die noch nie benutzt wurde. Zurück zu einer früheren Stimme geht schnell.
+- Aus der Rohaufnahme wird die MP3 für die App: Tempo (tonhöhenerhaltend, ohne neu zu sprechen), Stille am Anfang
+  und Ende entfernt, Lautstärke angeglichen, nach stimme/<prüfsumme>.mp3. Der Name hängt an Text, Stimme und Tempo.
+- Die Pause zwischen den Sätzen setzt die App beim Abspielen ein; dafür muss nichts neu aufgenommen werden.
+- Erst wenn alles fertig ist, wird die Liste ausgetauscht und alte Aufnahmen gelöscht: Bis dahin spricht die App
+  mit der bisherigen Stimme weiter. Bricht ein Durchgang ab, geht der nächste dort weiter (Zwischenspeicher).
+- js/aufnahmen.js bekommt die Liste (Spruch → seine Sätze mit Datei und Länge), sw.js die Dateien für die Offline-Kopie.
 """
 import hashlib
 import json
@@ -21,26 +26,32 @@ import re
 import subprocess
 import sys
 import tempfile
-import wave
+import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from sprecher import PARAMETER, katalog, python_fuer  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "stimme"
-BASE = Path.home() / ".local/share/meditation-stimme"
-MODEL = BASE / "stimmen/de_DE-thorsten-high.onnx"
-LENGTH_SCALE = 1.25        # etwas langsamer als normal (A2)
-SENTENCE_SILENCE = 0.7     # Sekunden Pause zwischen zwei Sätzen innerhalb einer Zeile
-SETTINGS = f"thorsten-high|{LENGTH_SCALE}|{SENTENCE_SILENCE}|v1"
+ROH = Path.home() / ".local/share/meditation-app/rohaufnahmen"
+PROTOKOLL = Path.home() / ".local/share/meditation-app/sprecher.log"
+STANDARD = {"programm": "piper", "stimme": "thorsten", "tempo": 1.0}
+# Bisherige Dateinamen der ersten Stimme (Piper Thorsten A2), damit vorhandene Aufnahmen gültig bleiben
+ALT_SETTINGS = "thorsten-high|1.25|0.7|v1"
 
 
 def texts_from_app():
-    """Alle Sprüche, so wie die App sie kennt: Fassung des Inhabers aus config.js (sonst der Grundbestand aus texte.js),
-    geprüft mit derselben Funktion wie in der App (cleanSayings in js/zustand.js). Auch deaktivierte Sprüche, damit
-    späteres Einschalten keine neue Aufnahme braucht. Reihenfolge wie in der App, ohne Doppelte."""
+    """Alle Sprüche und die Einstellungen, so wie die App sie kennt: Fassung des Inhabers aus config.js (sonst der
+    Grundbestand aus texte.js), geprüft mit denselben Funktionen wie in der App (cleanSayings, cleanSettings in
+    js/zustand.js). Auch deaktivierte Sprüche, damit späteres Einschalten keine neue Aufnahme braucht. Reihenfolge wie
+    in der App, ohne Doppelte."""
     skripte = "".join(f'<script src="{(ROOT / f).as_uri()}"></script>'
                       for f in ["js/phasen.js", "js/texte.js", "config.js", "js/zustand.js"])
     page = (f'<!doctype html><meta charset="utf-8">{skripte}<pre id="o"></pre>'
-            '<script>o.textContent = JSON.stringify(PHASES.flatMap(p => allSayings(p.id).map(s => s.text)))</script>')
+            '<script>o.textContent = JSON.stringify({ texte: PHASES.flatMap(p => allSayings(p.id).map(s => s.text)),'
+            ' stimme: settings.stimme })</script>')
     with tempfile.TemporaryDirectory() as tmp:
         f = Path(tmp, "t.html")
         f.write_text(page)
@@ -48,10 +59,11 @@ def texts_from_app():
                               "--dump-dom", f.as_uri()], check=True, capture_output=True, text=True).stdout
     raw = re.search(r'<pre id="o">(.*?)</pre>', dom, re.S).group(1)
     raw = raw.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", '"').replace("&amp;", "&")
-    texte = list(dict.fromkeys(json.loads(raw)))
+    daten = json.loads(raw)
+    texte = list(dict.fromkeys(daten["texte"]))
     if not texte:
         sys.exit("Keine Sprüche gefunden – lädt die App ihre Texte?")
-    return texte
+    return texte, {**STANDARD, **(daten.get("stimme") or {})}
 
 
 # Jeder Satz wird einzeln aufgenommen; die App setzt die Sätze eines Spruchs beim Abspielen mit der im Admin-Bereich
@@ -72,31 +84,74 @@ def saetze(text):
     return teile
 
 
-def file_for(text):
-    return OUT / (hashlib.sha1(f"{SETTINGS}|{text}".encode()).hexdigest()[:12] + ".mp3")
+class Stimme:
+    """Die gewählte Stimme: wo ihre Rohaufnahmen liegen und wie die MP3-Dateien heißen."""
+
+    def __init__(self, wahl):
+        programme = katalog()
+        if wahl["programm"] not in programme or wahl["stimme"] not in programme[wahl["programm"]]["stimmen"]:
+            sys.exit(f"Unbekannte Stimme {wahl['programm']}/{wahl['stimme']} (werkzeuge/stimmen.json)")
+        self.programm, self.name, self.tempo = wahl["programm"], wahl["stimme"], float(wahl["tempo"])
+        self.titel = programme[self.programm]["name"] + " – " + programme[self.programm]["stimmen"][self.name]["name"]
+        eintrag = programme[self.programm]["stimmen"][self.name]
+        # Alles, was den Klang der Rohaufnahme bestimmt; die Hörprobe gehört nicht dazu
+        self.kennung = json.dumps([self.programm, {k: v for k, v in eintrag.items() if k not in ("name", "probe")},
+                                   PARAMETER[self.programm]], sort_keys=True)
+        self.roh_ordner = ROH / f"{self.programm}-{self.name}"
+        self.alt = (self.programm, self.name, self.tempo) == ("piper", "thorsten", 1.0)
+
+    def roh(self, satz):
+        return self.roh_ordner / (hashlib.sha1(f"{self.kennung}|{satz}".encode()).hexdigest()[:16] + ".wav")
+
+    def mp3(self, satz):
+        if self.alt:
+            schluessel = f"{ALT_SETTINGS}|{satz}"
+        else:
+            schluessel = f"{self.kennung}|{self.tempo:.2f}|v2|{satz}"
+        return OUT / (hashlib.sha1(schluessel.encode()).hexdigest()[:12] + ".mp3")
 
 
-def record(voice, cfg, text, target, melden=None):
-    from piper import SynthesisConfig  # noqa: F401 (nur im Piper-Ordner vorhanden)
-    with tempfile.TemporaryDirectory() as tmp:
-        wav = Path(tmp, "s.wav")
-        with wave.open(str(wav), "wb") as w:
-            first = True
-            for chunk in voice.synthesize(text, syn_config=cfg):
-                if first:
-                    w.setnchannels(1); w.setsampwidth(2); w.setframerate(chunk.sample_rate)
-                    first = False
-                else:   # Pause zwischen zwei Sätzen
-                    w.writeframes(b"\0\0" * int(chunk.sample_rate * SENTENCE_SILENCE))
-                w.writeframes(chunk.audio_int16_bytes)
-        if melden:
-            melden()   # Teilschritt: gesprochen, jetzt umwandeln
-        # Stille vorn und hinten weg, Lautstärke angleichen, MP3 mono 64 kbit/s
-        subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", str(wav), "-af",
-                        "silenceremove=start_periods=1:start_threshold=-50dB,areverse,"
-                        "silenceremove=start_periods=1:start_threshold=-50dB,areverse,"
-                        "loudnorm=I=-18:TP=-2:LRA=7,apad=pad_dur=0.15",
-                        "-ar", "22050", "-ac", "1", "-b:a", "64k", str(target)], check=True)
+class Sprecher:
+    """Das Sprachprogramm in seiner eigenen Python-Umgebung, einmal geladen für alle Sätze."""
+
+    def __init__(self, stimme):
+        python = python_fuer(stimme.programm)
+        if not python.exists():
+            sys.exit(f"{katalog()[stimme.programm]['name']} ist auf diesem Rechner nicht eingerichtet ({python.parent.parent})")
+        PROTOKOLL.parent.mkdir(parents=True, exist_ok=True)
+        self.log = open(PROTOKOLL, "a")
+        self.log.write(f"\n--- {time.strftime('%Y-%m-%d %H:%M:%S')} {stimme.titel}\n"); self.log.flush()
+        self.p = subprocess.Popen([str(python), str(Path(__file__).with_name("sprecher.py")), stimme.programm, stimme.name],
+                                  stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.log, text=True, bufsize=1)
+        self.antwort("BEREIT")
+
+    def antwort(self, erwartet):
+        zeile = self.p.stdout.readline().strip()
+        if zeile != erwartet:
+            self.p.kill()
+            sys.exit(f"Das Sprachprogramm ist abgebrochen (Einzelheiten: {PROTOKOLL})")
+
+    def sprechen(self, satz, ziel):
+        ziel.parent.mkdir(parents=True, exist_ok=True)
+        self.p.stdin.write(json.dumps({"text": satz, "ziel": str(ziel)}, ensure_ascii=False) + "\n")
+        self.antwort("OK")
+
+    def ende(self):
+        self.p.stdin.close()
+        self.p.wait(timeout=60)
+
+
+def umwandeln(roh, ziel, tempo):
+    """Rohaufnahme → MP3 für die App. Tempo mit Rubber Band (Tonhöhe bleibt), Stille vorn und hinten weg, Lautstärke
+    angleichen, mono 64 kbit/s. Erst in eine Nachbardatei, dann umbenennen: nie eine halbe Datei in stimme/."""
+    filter_ = ([f"rubberband=tempo={tempo:.2f}:pitchq=quality"] if tempo != 1.0 else []) + [
+        "silenceremove=start_periods=1:start_threshold=-50dB", "areverse",
+        "silenceremove=start_periods=1:start_threshold=-50dB", "areverse",
+        "loudnorm=I=-18:TP=-2:LRA=7", "apad=pad_dur=0.15"]
+    tmp = ziel.with_name(ziel.stem + ".tmp.mp3")
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", str(roh), "-af", ",".join(filter_),
+                    "-ar", "22050", "-ac", "1", "-b:a", "64k", str(tmp)], check=True)
+    tmp.replace(ziel)
 
 
 def duration(path):
@@ -111,30 +166,43 @@ def main():
     import fcntl
     sperre = open(OUT / ".sperre", "w")
     fcntl.flock(sperre, fcntl.LOCK_EX)
-    # Fortschritt für den Admin-Helfer (Ladebalken mit Prozent im Admin-Bereich), je eine Zeile:
-    #   PHASE lesen | PHASE stimme | GESAMT n | [k/n] Satz (beginnt) | TEIL k/n (gesprochen) | FERTIG k/n
-    #   PHASE liste | LISTE i/m (Länge neuer Aufnahmen messen) | ENDE
+    # Fortschritt für den Admin-Helfer (Ladebalken mit Prozent und Restzeit im Admin-Bereich), je eine Zeile:
+    #   PHASE lesen | STIMME Name | GESAMT n (MP3 zu erzeugen) | SPRECHEN m (davon neu zu sprechen)
+    #   PHASE stimme (Programm lädt) | [k/m] Satz (wird gesprochen) | FERTIG k/m
+    #   PHASE umwandeln | UMWANDELN i/n | PHASE liste | LISTE i/j | ENDE
     print("PHASE lesen", flush=True)
-    texts = texts_from_app()
+    texts, wahl = texts_from_app()
+    stimme = Stimme(wahl)
+    print(f"STIMME {stimme.titel}", flush=True)
     alle_saetze = list(dict.fromkeys(z for t in texts for z in saetze(t)))
-    todo = [z for z in alle_saetze if not file_for(z).exists()]
+    todo = [z for z in alle_saetze if not stimme.mp3(z).exists()]
+    sprechen = [z for z in todo if not stimme.roh(z).exists()]
     print(f"GESAMT {len(todo)}", flush=True)
-    if todo:
+    print(f"SPRECHEN {len(sprechen)}", flush=True)
+    if sprechen:
         print("PHASE stimme", flush=True)
-        from piper import PiperVoice, SynthesisConfig
-        voice = PiperVoice.load(str(MODEL))
-        cfg = SynthesisConfig(length_scale=LENGTH_SCALE)
-        for k, t in enumerate(todo, 1):
-            print(f"[{k - 1}/{len(todo)}] {t}", flush=True)
-            record(voice, cfg, t, file_for(t), lambda: print(f"TEIL {k - 1}/{len(todo)}", flush=True))
-            print(f"FERTIG {k}/{len(todo)}", flush=True)
-    keep = {file_for(z).name for z in alle_saetze}
+        sprecher = Sprecher(stimme)
+        for k, z in enumerate(sprechen, 1):
+            print(f"[{k - 1}/{len(sprechen)}] {z}", flush=True)
+            sprecher.sprechen(z, stimme.roh(z))
+            print(f"FERTIG {k}/{len(sprechen)}", flush=True)
+        sprecher.ende()
+    if todo:
+        print("PHASE umwandeln", flush=True)
+        with ThreadPoolExecutor(4) as pool:   # ffmpeg je Satz, vier gleichzeitig
+            for i, _ in enumerate(pool.map(lambda z: umwandeln(stimme.roh(z), stimme.mp3(z), stimme.tempo), todo), 1):
+                print(f"UMWANDELN {i}/{len(todo)}", flush=True)
+    keep = {stimme.mp3(z).name for z in alle_saetze}
     for f in OUT.glob("*.mp3"):
         if f.name not in keep:
-            print("gelöscht (Satz gibt es nicht mehr):", f.name)
+            f.unlink()
+    # Rohaufnahmen dieser Stimme zu Sätzen, die es nicht mehr gibt, weg; andere Stimmen bleiben (schneller zurück)
+    roh_keep = {stimme.roh(z).name for z in alle_saetze}
+    for f in stimme.roh_ordner.glob("*.wav"):
+        if f.name not in roh_keep:
             f.unlink()
 
-    # Längen: aus der bisherigen Liste übernehmen, nur neue Aufnahmen messen (schneller als alle 100 neu)
+    # Längen: aus der bisherigen Liste übernehmen, nur neue Aufnahmen messen
     print("PHASE liste", flush=True)
     bekannt = {}
     try:
@@ -144,12 +212,14 @@ def main():
                 bekannt[datei] = sek
     except (OSError, AttributeError, ValueError, IndexError, TypeError):
         pass
-    neu = [z for z in alle_saetze if f"stimme/{file_for(z).name}" not in bekannt]
-    for i, z in enumerate(neu, 1):
-        bekannt[f"stimme/{file_for(z).name}"] = duration(file_for(z))
-        print(f"LISTE {i}/{len(neu)}", flush=True)
+    name = lambda z: f"stimme/{stimme.mp3(z).name}"   # noqa: E731
+    neu = [z for z in alle_saetze if name(z) not in bekannt]
+    with ThreadPoolExecutor(4) as pool:
+        for i, (z, sek) in enumerate(zip(neu, pool.map(lambda z: duration(stimme.mp3(z)), neu)), 1):
+            bekannt[name(z)] = sek
+            print(f"LISTE {i}/{len(neu)}", flush=True)
     # Je Spruch die Sätze in Reihenfolge: [[Datei, Sekunden], …]
-    rec = {t: [[f"stimme/{file_for(z).name}", bekannt[f"stimme/{file_for(z).name}"]] for z in saetze(t)] for t in texts}
+    rec = {t: [[name(z), bekannt[name(z)]] for z in saetze(t)] for t in texts}
     # Erst in eine Nachbardatei, dann austauschen: Die App liest nie eine halb geschriebene Liste
     ziel = ROOT / "js/aufnahmen.js"
     tmp = ziel.with_suffix(".tmp")
@@ -168,7 +238,8 @@ def main():
         sys.exit("sw.js: Abschnitt „// Aufnahmen …“ nicht gefunden")
     (ROOT / "sw.js").write_text(sw)
     size = sum(f.stat().st_size for f in OUT.glob("*.mp3"))
-    print(f"{len(texts)} Sprüche, {len(alle_saetze)} Sätze, {len(todo)} neu aufgenommen, zusammen {size / 1e6:.1f} MB")
+    print(f"{stimme.titel}, Tempo {stimme.tempo:.2f}: {len(texts)} Sprüche, {len(alle_saetze)} Sätze, "
+          f"{len(sprechen)} neu gesprochen, {len(todo)} umgewandelt, zusammen {size / 1e6:.1f} MB")
     print("ENDE", flush=True)
 
 

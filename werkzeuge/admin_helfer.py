@@ -14,8 +14,11 @@ admin-helfer.log daneben).
   zurück (der Stand davor wird dabei selbst gesichert). Anlass: Am 6. Oktober 2026 gingen überarbeitete des Inhabers
   Texte verloren, weil Claude config.js nach Tests zurückgesetzt hat.
 - Automatische Vertonung (Inhaber, Oktober 2026): Nach jedem Speichern nimmt der Helfer im Hintergrund alle neuen oder
-  geänderten Sprüche mit der gewählten Stimme auf (werkzeuge/aufnahmen.py mit Piper). POST /api/aufnahme-status
-  liefert den Fortschritt für den Ladebalken im Admin-Bereich.
+  geänderten Sprüche mit der gewählten Stimme auf (werkzeuge/aufnahmen.py; Programm, Stimme und Tempo wählt der
+  Inhaber unter „Einstellungen“, die Auswahl steht in werkzeuge/stimmen.json). POST /api/aufnahme-status liefert den
+  Fortschritt für den Ladebalken im Admin-Bereich, POST /api/stimmen die Auswahl mit Hörproben. Wechselt die Stimme
+  oder das Tempo während einer Vertonung, bricht der Helfer sie ab und beginnt mit der neuen (schon Gesprochenes
+  bleibt im Zwischenspeicher).
 - POST /api/vorschau und /api/veroeffentlichen: „Für alle veröffentlichen“ (Sprüche, Klänge und Aufnahmen). Nie im Arbeitsordner (dort arbeitet
   Claude oft auf einer anderen Arbeitskopie), sondern in einer eigenen Kopie des Originals:
     1. lokal:  eigene Kopie (git worktree in KOPIE) auf den Stand von GitHub bringen (origin/main)
@@ -37,6 +40,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -51,7 +55,17 @@ KOPIE = Path.home() / ".local" / "share" / "meditation-app" / "veroeffentlichen-
 SPERRE = threading.Lock()   # nie zwei Veröffentlichungen gleichzeitig
 SICHERUNGEN = Path.home() / ".local" / "share" / "meditation-app" / "sicherungen"
 SICHERUNGEN_MAX = 500
-PIPER_PYTHON = Path.home() / ".local" / "share" / "meditation-stimme" / "venv" / "bin" / "python"
+DATEN = Path.home() / ".local" / "share"
+STIMMEN = Path(__file__).resolve().parent / "stimmen.json"
+STIMME_STANDARD = {"programm": "piper", "stimme": "thorsten", "tempo": 1.0}   # wie VOICE_DEFAULT in js/zustand.js
+HOERPROBEN = "hoerproben/entscheidung"
+
+
+def stimmen_katalog():
+    """Programme und Stimmen aus werkzeuge/stimmen.json; „eingerichtet“, wenn die Python-Umgebung des Programms da ist."""
+    daten = json.loads(STIMMEN.read_text(encoding="utf-8"))
+    return {k: {**v, "eingerichtet": (DATEN / v["ordner"] / "venv" / "bin" / "python").exists()}
+            for k, v in daten.items() if not k.startswith("_")}
 
 
 class Fehler(Exception):
@@ -107,8 +121,52 @@ def pruefen(entwurf):
     pause = einst.get("pause", 2)
     if not isinstance(pause, (int, float)) or isinstance(pause, bool) or not 0.5 <= pause <= 10:
         raise Fehler("Die Sprechpause muss zwischen 0,5 und 10 Sekunden liegen.")
+    settings = {"pause": round(float(pause), 1)}
+    stimme = stimme_pruefen(einst.get("stimme"))
+    if stimme != STIMME_STANDARD:   # Standard steht nicht in config.js (wie bisher)
+        settings["stimme"] = stimme
     return {"version": 1, "sayings": sauber, "sounds": {k: sounds.get(k) is not False for k in KLAENGE},
-            "settings": {"pause": round(float(pause), 1)}}
+            "settings": settings}
+
+
+def stimme_pruefen(roh):
+    """Gewählte Stimme (settings.stimme): Programm und Stimme aus werkzeuge/stimmen.json, Tempo 0,8–1,2 in 0,05."""
+    if roh is None:
+        return dict(STIMME_STANDARD)
+    if not isinstance(roh, dict) or set(roh) - {"programm", "stimme", "tempo"}:
+        raise Fehler("Die Stimme ist ungültig.")
+    programm, name, tempo = roh.get("programm"), roh.get("stimme"), roh.get("tempo", 1)
+    katalog = stimmen_katalog()
+    if programm not in katalog or not isinstance(name, str) or name not in katalog[programm]["stimmen"]:
+        raise Fehler("Diese Stimme gibt es nicht.")
+    if not katalog[programm]["eingerichtet"]:
+        raise Fehler(f"{katalog[programm]['name']} ist auf diesem Rechner nicht eingerichtet.")
+    if not isinstance(tempo, (int, float)) or isinstance(tempo, bool) or not 0.8 <= tempo <= 1.2:
+        raise Fehler("Das Sprechtempo muss zwischen 80 und 120 % liegen.")
+    return {"programm": programm, "stimme": name, "tempo": round(round(float(tempo) * 20) / 20, 2)}
+
+
+def stimme_text(st):
+    p = stimmen_katalog().get(st["programm"], {})
+    return f"{p.get('name', st['programm'])} {p.get('stimmen', {}).get(st['stimme'], {}).get('name', st['stimme'])}"
+
+
+def stimmen_liste(root):
+    """Für die Auswahl im Admin-Bereich: Programme mit ihren Stimmen und Hörproben, Zahl der Sätze für die Zeitangabe."""
+    saetze = 0
+    try:
+        liste = (Path(root) / "js" / "aufnahmen.js").read_text(encoding="utf-8")
+        saetze = len(set(re.findall(r'"stimme/[0-9a-f]+\.mp3"', liste)))
+    except OSError:
+        pass
+    programme = []
+    for pid, p in stimmen_katalog().items():
+        stimmen = [{"id": sid, "name": s["name"],
+                    "probe": f"{HOERPROBEN}/{s['probe']}" if (Path(root) / HOERPROBEN / s.get("probe", "-")).exists() else None}
+                   for sid, s in p["stimmen"].items()]
+        programme.append({"id": pid, "name": p["name"], "eingerichtet": p["eingerichtet"],
+                          "sekundenJeSatz": p["sekunden_je_satz"], "stimmen": stimmen})
+    return {"ok": True, "programme": programme, "saetze": saetze}
 
 
 def config_text(daten):
@@ -206,74 +264,114 @@ def speichern(entwurf, ziel):
 # Läuft im Hintergrund, immer nur einmal gleichzeitig. Kommt während einer Vertonung neues Speichern dazu, folgt
 # danach ein weiterer Durchgang mit dem neuen Stand (das Werkzeug nimmt nur auf, was noch fehlt).
 VERTONUNG = {"laeuft": False, "fertig": 0, "gesamt": 0, "aktuell": "", "fehler": "", "nochmal": False, "stand": 0,
-             "prozent": 0, "schritt": ""}
+             "prozent": 0, "schritt": "", "rest": None, "stimme": "", "wahl": None, "prozess": None}
 VERTONUNG_SPERRE = threading.Lock()
+
+
+def gewaehlte_stimme(root):
+    daten = config_lesen(Path(root) / "config.js") or {}
+    return {**STIMME_STANDARD, **((daten.get("settings") or {}).get("stimme") or {})}
 
 
 def vertonen_anstossen(root):
     with VERTONUNG_SPERRE:
         if VERTONUNG["laeuft"]:
             VERTONUNG["nochmal"] = True
+            # Neue Stimme oder neues Tempo: den laufenden Durchgang nicht zu Ende bringen (das kann bei XTTS oder
+            # Chatterbox über eine Stunde dauern), sondern gleich mit der neuen Wahl beginnen. Schon gesprochene Sätze
+            # liegen im Zwischenspeicher und werden nicht noch einmal gesprochen.
+            prozess = VERTONUNG["prozess"]
+            if prozess and VERTONUNG["wahl"] != gewaehlte_stimme(root):
+                VERTONUNG["abgebrochen"] = True
+                try:
+                    os.killpg(prozess.pid, 15)   # mit dem Sprachprogramm, das aufnahmen.py gestartet hat
+                except OSError:
+                    pass
             return
         VERTONUNG.update(laeuft=True, fertig=0, gesamt=0, aktuell="", fehler="", nochmal=False, prozent=0,
-                         schritt="Vertonung startet")
+                         schritt="Vertonung startet", rest=None, stimme="")
     threading.Thread(target=vertonen, args=(root,), daemon=True).start()
 
 
 def vertonen(root):
     while True:
         try:
-            if not PIPER_PYTHON.exists():
-                raise Fehler("Piper ist nicht eingerichtet (~/.local/share/meditation-stimme).")
-            prozess = subprocess.Popen([str(PIPER_PYTHON), str(Path(root) / "werkzeuge" / "aufnahmen.py")], cwd=root,
-                                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
-            letzte, gesamt, teile = "", 0, 0
+            VERTONUNG.update(wahl=gewaehlte_stimme(root), abgebrochen=False)
+            # Eigene Prozessgruppe: Beim Abbrechen endet auch das Sprachprogramm (werkzeuge/sprecher.py)
+            prozess = subprocess.Popen([sys.executable, str(Path(root) / "werkzeuge" / "aufnahmen.py")], cwd=root,
+                                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
+                                       start_new_session=True)
+            VERTONUNG["prozess"] = prozess
+            letzte, gesamt, sprechen, beginn = "", 0, 0, None
             for zeile in prozess.stdout:
                 zeile = zeile.rstrip()
                 letzte = zeile or letzte
-                # Prozent: Texte lesen bis 4 %, Stimme laden bis 12 %, Sätze 12–92 % (je Satz zwei Teilschritte:
-                # sprechen, umwandeln), Liste schreiben 92–100 %
+                # Prozent: Texte lesen bis 4 %, Programm laden bis 8 %, Sätze sprechen 8–85 % (ohne Umwandeln bis 92 %),
+                # umwandeln bis 92 %, Liste schreiben 92–100 %. Restzeit aus der bisherigen Zeit je Satz.
+                bis = 85 if gesamt else 92
                 if zeile == "PHASE lesen":
                     VERTONUNG.update(prozent=1, schritt="Texte werden gelesen")
-                elif zeile == "PHASE stimme":
-                    VERTONUNG.update(prozent=5, schritt="Stimme wird geladen")
+                elif m := re.match(r"STIMME (.*)$", zeile):
+                    VERTONUNG["stimme"] = m.group(1)
                 elif m := re.match(r"GESAMT (\d+)$", zeile):
                     gesamt = int(m.group(1))
                     VERTONUNG.update(gesamt=gesamt, fertig=0, prozent=4)
+                elif m := re.match(r"SPRECHEN (\d+)$", zeile):
+                    sprechen = int(m.group(1))
+                    try:   # erste Schätzung, bis der erste Satz gesprochen ist
+                        je_satz = stimmen_katalog()[VERTONUNG["wahl"]["programm"]]["sekunden_je_satz"]
+                        VERTONUNG["rest"] = round(je_satz * sprechen + 20 * bool(sprechen) + 0.3 * gesamt)
+                    except (KeyError, OSError, ValueError):
+                        pass
+                elif zeile == "PHASE stimme":
+                    VERTONUNG.update(prozent=5, schritt="Sprachprogramm wird geladen", gesamt=sprechen)
                 elif m := re.match(r"\[(\d+)/(\d+)\] (.*)$", zeile):
-                    teile = 2 * int(m.group(1))
-                    VERTONUNG.update(fertig=int(m.group(1)), aktuell=m.group(3), schritt="Satz wird gesprochen")
-                elif re.match(r"TEIL (\d+)/(\d+)$", zeile):
-                    teile += 1
-                    VERTONUNG.update(schritt="Satz wird umgewandelt")
+                    k = int(m.group(1))
+                    if beginn is None:
+                        beginn = (time.monotonic(), k)
+                    VERTONUNG.update(fertig=k, aktuell=m.group(3), schritt="Satz wird gesprochen",
+                                     prozent=8 + (77 if gesamt else 84) * k // max(1, sprechen))
                 elif m := re.match(r"FERTIG (\d+)/(\d+)$", zeile):
-                    teile = 2 * int(m.group(1))
-                    VERTONUNG.update(fertig=int(m.group(1)))
+                    k = int(m.group(1))
+                    VERTONUNG.update(fertig=k, prozent=8 + (77 if gesamt else 84) * k // max(1, sprechen))
+                    if beginn and k > beginn[1]:
+                        je_satz = (time.monotonic() - beginn[0]) / (k - beginn[1])
+                        VERTONUNG["rest"] = round(je_satz * (sprechen - k) + 0.3 * gesamt)
+                elif zeile == "PHASE umwandeln":
+                    VERTONUNG.update(schritt="Sätze werden umgewandelt", aktuell="", gesamt=gesamt, fertig=0,
+                                     prozent=max(VERTONUNG["prozent"], 8 if not sprechen else bis))
+                    beginn = (time.monotonic(), 0)
+                elif m := re.match(r"UMWANDELN (\d+)/(\d+)$", zeile):
+                    k = int(m.group(1))
+                    start = 85 if sprechen else 8
+                    VERTONUNG.update(fertig=k, prozent=start + (92 - start) * k // max(1, gesamt))
+                    if beginn and k:
+                        VERTONUNG["rest"] = round((time.monotonic() - beginn[0]) / k * (gesamt - k)) + 2
                 elif zeile == "PHASE liste":
-                    VERTONUNG.update(prozent=92, schritt="Liste wird geschrieben", aktuell="")
+                    VERTONUNG.update(prozent=92, schritt="Liste wird geschrieben", aktuell="", rest=None)
                 elif m := re.match(r"LISTE (\d+)/(\d+)$", zeile):
                     VERTONUNG["prozent"] = 92 + 7 * int(m.group(1)) // max(1, int(m.group(2)))
                 elif zeile == "ENDE":
-                    VERTONUNG.update(prozent=100, schritt="Fertig")
-                if gesamt and VERTONUNG["schritt"].startswith("Satz"):
-                    VERTONUNG["prozent"] = 12 + 80 * teile // (2 * gesamt)
-            if prozess.wait():
+                    VERTONUNG.update(prozent=100, schritt="Fertig", rest=None)
+            if prozess.wait() and not VERTONUNG.get("abgebrochen"):
                 raise Fehler(f"Die Vertonung ist abgebrochen: {letzte[:200]}")
             VERTONUNG["fehler"] = ""
         except (Fehler, OSError) as e:
             VERTONUNG["fehler"] = str(e)
             print(f"Vertonung: {e}", file=sys.stderr, flush=True)
         with VERTONUNG_SPERRE:
+            VERTONUNG["prozess"] = None
             VERTONUNG["stand"] += 1   # die App lädt danach die Liste der Aufnahmen neu
             if not VERTONUNG["nochmal"]:
-                VERTONUNG.update(laeuft=False, aktuell="")
+                VERTONUNG.update(laeuft=False, aktuell="", rest=None)
                 return
-            VERTONUNG.update(nochmal=False, fertig=0, gesamt=0, aktuell="", prozent=0, schritt="Vertonung startet")
+            VERTONUNG.update(nochmal=False, fertig=0, gesamt=0, aktuell="", prozent=0, schritt="Vertonung startet",
+                             rest=None)
 
 
 def aufnahme_status():
     return {"ok": True, **{k: VERTONUNG[k] for k in ("laeuft", "fertig", "gesamt", "aktuell", "fehler", "stand",
-                                                      "prozent", "schritt")}}
+                                                      "prozent", "schritt", "rest", "stimme")}}
 
 
 AUFNAHMEN_BLOCK = re.compile(r"(  // Aufnahmen \(setzt werkzeuge/aufnahmen\.py\)\n).*?(  // Ende Aufnahmen\n)", re.S)
@@ -408,6 +506,12 @@ def unterschiede(alt, neu, grund):
     alt_pause = (alt.get("settings") or {}).get("pause", 2)   # ohne Angabe gilt der Standard der App (2,0 s)
     if alt_pause != neu["settings"]["pause"]:
         zeilen.append(f"Sprechpause: {str(alt_pause).replace('.', ',')} s → {str(neu['settings']['pause']).replace('.', ',')} s")
+    alt_stimme = {**STIMME_STANDARD, **((alt.get("settings") or {}).get("stimme") or {})}
+    neu_stimme = neu["settings"].get("stimme", STIMME_STANDARD)
+    if alt_stimme["programm"] != neu_stimme["programm"] or alt_stimme["stimme"] != neu_stimme["stimme"]:
+        zeilen.append(f"Stimme: {stimme_text(alt_stimme)} → {stimme_text(neu_stimme)}")
+    if alt_stimme["tempo"] != neu_stimme["tempo"]:
+        zeilen.append(f"Sprechtempo: {round(alt_stimme['tempo'] * 100)} % → {round(neu_stimme['tempo'] * 100)} %")
     for k in KLAENGE:
         if alt.get("sounds", {}).get(k, True) != neu["sounds"][k]:
             zeilen.append(f"Klang {k.capitalize()}: {'aktiviert' if neu['sounds'][k] else 'deaktiviert'}")
@@ -523,6 +627,7 @@ class Helfer(http.server.SimpleHTTPRequestHandler):
 
         aktionen = {"/api/speichern": speichern_und_vertonen,
                     "/api/aufnahme-status": lambda e: aufnahme_status(),
+                    "/api/stimmen": lambda e: stimmen_liste(self.root),
                     "/api/stand": lambda e: {"ok": True, "stand": fingerabdruck(self.root / "config.js")},
                     "/api/sicherungen": lambda e: sicherungen_liste(),
                     "/api/wiederherstellen": lambda e: (wiederherstellen(e, self.root / "config.js"),
