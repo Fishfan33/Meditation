@@ -80,6 +80,9 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
   - **Sätze nacheinander mit einstellbarer Sprechpause** (Inhaber, 6. Oktober 2026): zuerst 1,1 s, dann „etwas länger“,
     Standard jetzt 2,0 s, im Admin-Bereich unter „Einstellungen“ 0,5–10 s in Zehntelsekunden (`settings.pause` in
     config.js, geprüft in `cleanSettings` und im Helfer); ist der Text einer Phase durch, geht es von vorn los.
+    **Die Pause gilt auch zwischen den Sätzen innerhalb eines Spruchs** (Inhaber): `aufnahmen.py` nimmt jeden Satz einzeln
+    auf (`saetze()`), `js/aufnahmen.js` hat je Spruch `[[Datei, Sek], …]`, `speak()` legt die Sätze mit `settings.pause`
+    dazwischen auf die Ton-Zeitachse. Eine geänderte Pause wirkt sofort, ohne neue Aufnahmen.
   - **Zeitende einer Phase (Inhaber):** Ein Satz darf anfangen, solange die Phase läuft, und wird zu Ende gesprochen;
     danach kein neuer. Es ist in Ordnung, wenn kurze Phasen nicht alle Sätze schaffen. Läuft der letzte Satz über das
     Ende, beginnt die nächste Phase erst danach (nie zwei Sätze übereinander).
@@ -137,6 +140,16 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
 - **Security-Audit (Oktober 2026), vor dem ersten Hochladen:** behoben: Helfer liefert nur der eigenen Seite aus (Host
   geprüft, keine versteckten Ordner wie `.git`, keine Ordnerlisten), Datenschutzseite auf die Aufnahmen angepasst, keine
   persönlichen Angaben in Projektdateien („der Inhaber“); erstes Hochladen als neue Geschichte (siehe oben).
+
+## Weiter am nächsten Tag (Stand 6. Oktober 2026, abends)
+
+- **Stimme natürlicher machen:** Hörproben `hoerproben/vergleich/` (1 Piper wie jetzt, 2 Piper lebendiger:
+  length 1,2, noise 0,85, noise-w 1,1) – **„lebendiger“ ist laut Inhaber schlechter, Piper-Einstellungen bleiben (A2)**. Als Nächstes: XTTS-v2 mit Thorsten-Vorlage installieren (2–3 GB, eigener Ordner,
+  vorher Sicherheitsprüfung wie bei Piper erklären) und Proben 3/4 erzeugen; Alternativen für Deutsch: Azure
+  Killian/Conrad (Konto nötig), ElevenLabs (bezahlt). Der Inhaber entscheidet nach Gehör.
+- **Arbeitskopie `korrektur/pause-vorschau`** (Übernahme-Anfrage #1): enthält zusätzlich die Satz-Pausen und neue
+  Aufnahmen; lokal gespeichert, **Hochladen nur nach OK**.
+- Danach: durchgehende Tonspur fürs gesperrte iPhone, iPhone-Test, automatische Tests, Audit (alle Bereiche).
 
 ## Erkenntnisse aus dem Retro-Cockpit
 

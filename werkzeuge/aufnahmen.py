@@ -54,6 +54,24 @@ def texts_from_app():
     return texte
 
 
+# Jeder Satz wird einzeln aufgenommen; die App setzt die Sätze eines Spruchs beim Abspielen mit der im Admin-Bereich
+# eingestellten Pause zusammen (eine Einstellung für alle Pausen, Wunsch des Inhabers, Oktober 2026). So wirkt eine
+# geänderte Pause sofort, ohne neue Aufnahmen. Getrennt wird nach . ! ? …, wenn danach ein Großbuchstabe, eine Ziffer
+# oder ein Anführungszeichen kommt; nach Abkürzungen wie „z. B.“ nicht.
+SATZENDE = re.compile(r"(?<=[.!?…])\s+(?=[A-ZÄÖÜ0-9„\"'(])")
+ABKUERZUNGEN = ("z.", "d.", "u.", "bzw.", "ca.", "Nr.", "vgl.", "usw.", "etc.", "Dr.", "St.")
+
+
+def saetze(text):
+    teile = []
+    for t in SATZENDE.split(text):
+        if teile and teile[-1].endswith(ABKUERZUNGEN):
+            teile[-1] += " " + t
+        else:
+            teile.append(t)
+    return teile
+
+
 def file_for(text):
     return OUT / (hashlib.sha1(f"{SETTINGS}|{text}".encode()).hexdigest()[:12] + ".mp3")
 
@@ -98,7 +116,8 @@ def main():
     #   PHASE liste | LISTE i/m (Länge neuer Aufnahmen messen) | ENDE
     print("PHASE lesen", flush=True)
     texts = texts_from_app()
-    todo = [t for t in texts if not file_for(t).exists()]
+    alle_saetze = list(dict.fromkeys(z for t in texts for z in saetze(t)))
+    todo = [z for z in alle_saetze if not file_for(z).exists()]
     print(f"GESAMT {len(todo)}", flush=True)
     if todo:
         print("PHASE stimme", flush=True)
@@ -109,7 +128,7 @@ def main():
             print(f"[{k - 1}/{len(todo)}] {t}", flush=True)
             record(voice, cfg, t, file_for(t), lambda: print(f"TEIL {k - 1}/{len(todo)}", flush=True))
             print(f"FERTIG {k}/{len(todo)}", flush=True)
-    keep = {file_for(t).name for t in texts}
+    keep = {file_for(z).name for z in alle_saetze}
     for f in OUT.glob("*.mp3"):
         if f.name not in keep:
             print("gelöscht (Satz gibt es nicht mehr):", f.name)
@@ -120,19 +139,22 @@ def main():
     bekannt = {}
     try:
         alt = json.loads(re.search(r"self\.RECORDINGS\s*=\s*(.*);\s*$", (ROOT / "js/aufnahmen.js").read_text(), re.S).group(1))
-        bekannt = {datei: sek for datei, sek in alt.values()}
-    except (OSError, AttributeError, ValueError):
+        for wert in alt.values():   # alte Liste: [Datei, Sek]; neue: [[Datei, Sek], …]
+            for datei, sek in ([wert] if isinstance(wert[0], str) else wert):
+                bekannt[datei] = sek
+    except (OSError, AttributeError, ValueError, IndexError, TypeError):
         pass
-    neu = [t for t in texts if f"stimme/{file_for(t).name}" not in bekannt]
-    for i, t in enumerate(neu, 1):
-        bekannt[f"stimme/{file_for(t).name}"] = duration(file_for(t))
+    neu = [z for z in alle_saetze if f"stimme/{file_for(z).name}" not in bekannt]
+    for i, z in enumerate(neu, 1):
+        bekannt[f"stimme/{file_for(z).name}"] = duration(file_for(z))
         print(f"LISTE {i}/{len(neu)}", flush=True)
-    rec = {t: [f"stimme/{file_for(t).name}", bekannt[f"stimme/{file_for(t).name}"]] for t in texts}
+    # Je Spruch die Sätze in Reihenfolge: [[Datei, Sekunden], …]
+    rec = {t: [[f"stimme/{file_for(z).name}", bekannt[f"stimme/{file_for(z).name}"]] for z in saetze(t)] for t in texts}
     # Erst in eine Nachbardatei, dann austauschen: Die App liest nie eine halb geschriebene Liste
     ziel = ROOT / "js/aufnahmen.js"
     tmp = ziel.with_suffix(".tmp")
     tmp.write_text(
-        "// Meditation – Liste der Sprachaufnahmen: Satz → [Datei, Länge in Sekunden].\n"
+        "// Meditation – Liste der Sprachaufnahmen: Spruch → seine Sätze [[Datei, Länge in Sekunden], …].\n"
         "// Erzeugt von werkzeuge/aufnahmen.py, nicht von Hand bearbeiten. Fehlt ein Satz hier (Text geändert,\n"
         "// noch nicht neu aufgenommen), liest für ihn die Stimme des Browsers vor.\n"
         "self.RECORDINGS = " + json.dumps(rec, ensure_ascii=False, indent=1) + ";\n")
@@ -146,7 +168,7 @@ def main():
         sys.exit("sw.js: Abschnitt „// Aufnahmen …“ nicht gefunden")
     (ROOT / "sw.js").write_text(sw)
     size = sum(f.stat().st_size for f in OUT.glob("*.mp3"))
-    print(f"{len(texts)} Sätze, {len(todo)} neu aufgenommen, zusammen {size / 1e6:.1f} MB")
+    print(f"{len(texts)} Sprüche, {len(alle_saetze)} Sätze, {len(todo)} neu aufgenommen, zusammen {size / 1e6:.1f} MB")
     print("ENDE", flush=True)
 
 

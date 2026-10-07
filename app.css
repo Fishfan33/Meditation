@@ -221,10 +221,12 @@ dialog.session::backdrop { background: #0d0f16; }
   padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom));
 }
 .s-top { width: 100%; max-width: 720px; display: flex; justify-content: space-between; gap: 12px; font-size: 16px; }
-.s-phase { font-weight: 700; color: var(--ct); transition: color 1.5s; }
+.s-phase { font-weight: 700; color: var(--ct); transition: color 1.5s; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .s-left { color: var(--s-muted); font-variant-numeric: tabular-nums; }
 .s-top { align-items: center; }
-.s-right { display: inline-flex; align-items: center; gap: 12px; }
+/* Restzeit bleibt immer sichtbar; bei Platzmangel (iPhone) wird der Phasenname gekürzt, nie die Zeit */
+.s-right { display: inline-flex; align-items: center; gap: 12px; flex: none; }
+.s-left { white-space: nowrap; }
 /* Klang-Auswahl in der dunklen Meditations-Ansicht */
 .session .sound-wrap { position: relative; }
 .session .sound-btn { background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .22); color: var(--s-text); }
