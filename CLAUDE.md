@@ -157,9 +157,12 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
 
 - **Wahl des Inhabers (7. Oktober 2026): Chatterbox mit Vorlage „Karlsson“** (`chatterbox`/`karlsson`), Tempo 100 %.
   **Vertonung erst nach ausdrücklicher Zustimmung des Inhabers starten** (dauert etwa 3 Stunden; Umstellen der Stimme über
-  `/api/speichern` startet sie sofort). Bis dahin bleibt Piper Thorsten (A2) aktiv. Nach der Vertonung: „Für alle
-  veröffentlichen“, `datenschutz.html` (Vorlesen und Quellen: Chatterbox von Resemble AI, MIT; Vorlage Karlsson aus dem
-  M-AILABS-Datensatz, BSD-artige Lizenz; unhörbares Wasserzeichen, keine Daten über Hörer) und `stimme/QUELLE.md` anpassen.
+  `/api/speichern` startet sie sofort). Bis dahin bleibt Piper Thorsten (A2) aktiv. `datenschutz.html` und
+  `stimme/QUELLE.md` nennen schon beide Stimmen (Chatterbox von Resemble AI, MIT; Vorlage mit der Piper-Stimme
+  de_DE-karlsson-low aus einem eigenen Probetext erzeugt, die auf dem M-AILABS-Datensatz beruht; unhörbares Wasserzeichen).
+  **Ablauf (Inhaber, 7. Oktober 2026):** Code mergen, dann abends im Admin-Bereich Chatterbox/Karlsson wählen, Claude-App
+  und Browser schließen (Speicher), am nächsten Morgen **erst anhören** (▶, „Neu sprechen“), dann selbst veröffentlichen,
+  nicht automatisch.
 - **Einstellungen der Stimme: Variante A „im Admin-Bereich“** (Wahl des Inhabers, 7. Oktober 2026).
 - XTTS-v2 ist gelöscht (Programm, Modell, Hörproben, Zwischenspeicher; Wunsch des Inhabers nach seiner Wahl). Piper bleibt
   als schnelle Ersatzstimme.

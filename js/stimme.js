@@ -3,8 +3,8 @@
 // Reihenfolge aus index.html geladen werden (Phasen zuerst, Start zuletzt). Übersicht: CLAUDE.md, „Aufbau“.
 
 // ---------- Stimme ----------
-// Es liest Thorsten (Wahl A2 des Inhabers): vorab aufgenommen mit Piper, Liste in js/aufnahmen.js (RECORDINGS: Satz →
-// [Datei, Sekunden]). Fehlt für einen Satz die Aufnahme (neu oder geändert, noch nicht vertont), liest die
+// Es liest die im Admin-Bereich gewählte Stimme (Chatterbox „Karlsson“, Wahl des Inhabers; Ersatz Piper „Thorsten“):
+// vorab aufgenommen, Liste in js/aufnahmen.js (RECORDINGS: Satz → [[Datei, Sekunden], …]). Fehlt für einen Satz die Aufnahme (neu oder geändert, noch nicht vertont), liest die
 // Stimme des Browsers vor (Web Speech); gesucht wird dafür eine deutsche, möglichst männliche Stimme.
 const SPEECH_RATE = .88;   // etwas langsamer als normal: ruhig
 const SPEECH_PITCH = .92;
@@ -174,8 +174,9 @@ function updateVoiceNote() {
   if (!el) return;
   const all = PHASES.flatMap(p => spokenSayings(p.id));
   const missing = all.filter(s => !recordingOf(s.text)).length;
-  el.textContent = missing === 0 ? "Es liest Thorsten vor (Aufnahmen, auch ohne Internet)."
-    : missing < all.length ? `Es liest Thorsten vor; ${missing === 1 ? "ein Spruch ist" : `${missing} Sprüche sind`} noch nicht vertont und kommen von der Stimme des Browsers.`
+  // Ohne Namen der Stimme: Welche gilt, wählt der Inhaber im Admin-Bereich (Chatterbox „Karlsson“, Piper „Thorsten“ …)
+  el.textContent = missing === 0 ? "Vorgelesen aus Aufnahmen, auch ohne Internet."
+    : missing < all.length ? `Vorgelesen aus Aufnahmen; ${missing === 1 ? "ein Spruch ist" : `${missing} Sprüche sind`} noch nicht vertont und kommen von der Stimme des Browsers.`
     : !synth ? "Dieser Browser kann nicht vorlesen. Die Texte erscheinen während der Meditation auf dem Bildschirm."
     : chosenVoice ? `Vorläufig liest die Stimme des Browsers vor: ${chosenVoice.name}.`
     : "Vorläufig liest die Stimme des Browsers vor.";
