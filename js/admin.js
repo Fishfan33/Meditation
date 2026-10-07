@@ -389,8 +389,12 @@ function soundsMarkup() {
 // Sprechpause zwischen zwei Sätzen: in Sekunden mit einer Nachkommastelle, wie bei Audio- und Meditations-Apps
 // üblich; Regler und Zahlenfeld, „Probe hören“ liest zwei Sätze mit dieser Pause.
 const fmtSec = v => `${v.toFixed(1).replace(".", ",")} s`;
-const fmtWait = sec => sec < 90 ? "etwa eine Minute" : sec < 3600 ? `etwa ${Math.round(sec / 60)} Minuten`
-  : `etwa ${Math.floor(sec / 3600)} Std. ${Math.round(sec % 3600 / 60)} Min.`;
+const fmtWait = sec => {
+  if (sec < 90) return "etwa eine Minute";
+  if (sec < 3600) return `etwa ${Math.round(sec / 60)} Minuten`;
+  const h = Math.floor(sec / 3600), m = Math.round(sec % 3600 / 600) * 10;   // auf 10 Minuten gerundet
+  return `etwa ${h === 1 ? "eine Stunde" : `${h} Stunden`}${m && m < 60 ? ` ${m} Minuten` : ""}`;
+};
 let voiceCatalog = null, voiceProg = null, probeAudio = null;
 const currentVoice = () => settings.stimme || VOICE_DEFAULT;
 async function loadVoices() {
