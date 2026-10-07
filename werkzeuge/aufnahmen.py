@@ -233,8 +233,8 @@ class Stimme:
     def mp3(self, satz):
         if self.alt:
             schluessel = f"{ALT_SETTINGS}|{satz}"
-        else:
-            schluessel = f"{self.kennung}|{self.tempo:.2f}|v2|{satz}"
+        else:   # v3: MP3 in der Abtastrate der Rohaufnahme mit 96 kbit/s (vorher 22 kHz, 64 kbit/s)
+            schluessel = f"{self.kennung}|{self.tempo:.2f}|v3|{satz}"
         v = self.variante(satz)
         return self.out / (hashlib.sha1(f"{schluessel}{f'|{v}' if v else ''}".encode()).hexdigest()[:12] + ".mp3")
 
@@ -269,16 +269,21 @@ class Sprecher:
         self.p.wait(timeout=60)
 
 
-def umwandeln(roh, ziel, tempo):
+def umwandeln(roh, ziel, tempo, alt=False):
     """Rohaufnahme → MP3 für die App. Tempo mit Rubber Band (Tonhöhe bleibt), Stille vorn und hinten weg, Lautstärke
-    angleichen, mono 64 kbit/s. Erst in eine Nachbardatei, dann umbenennen: nie eine halbe Datei in stimme/."""
+    angleichen, mono. Abtastrate wie die Rohaufnahme (Chatterbox 24 kHz, Piper 22,05 kHz) mit 96 kbit/s, damit keine
+    Höhen verloren gehen (Oktober 2026, vorher fest 22,05 kHz und 64 kbit/s; alt=True für die alten Piper-Dateinamen).
+    Erst in eine Nachbardatei, dann umbenennen: nie eine halbe Datei in stimme/."""
+    import wave
+    with wave.open(str(roh)) as w:
+        rate = w.getframerate()
     filter_ = ([f"rubberband=tempo={tempo:.2f}:pitchq=quality"] if tempo != 1.0 else []) + [
         "silenceremove=start_periods=1:start_threshold=-50dB", "areverse",
         "silenceremove=start_periods=1:start_threshold=-50dB", "areverse",
         "loudnorm=I=-18:TP=-2:LRA=7", "apad=pad_dur=0.15"]
     tmp = ziel.with_name(ziel.stem + ".tmp.mp3")
     subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", str(roh), "-af", ",".join(filter_),
-                    "-ar", "22050", "-ac", "1", "-b:a", "64k", str(tmp)], check=True)
+                    "-ar", "22050" if alt else str(rate), "-ac", "1", "-b:a", "64k" if alt else "96k", str(tmp)], check=True)
     tmp.replace(ziel)
 
 
@@ -340,7 +345,7 @@ def main():
     if todo:
         print("PHASE umwandeln", flush=True)
         with ThreadPoolExecutor(4) as pool:   # ffmpeg je Satz, vier gleichzeitig
-            for i, _ in enumerate(pool.map(lambda z: umwandeln(stimme.roh(z), stimme.mp3(z), stimme.tempo), todo), 1):
+            for i, _ in enumerate(pool.map(lambda z: umwandeln(stimme.roh(z), stimme.mp3(z), stimme.tempo, stimme.alt), todo), 1):
                 print(f"UMWANDELN {i}/{len(todo)}", flush=True)
     keep = {stimme.mp3(z).name for z in alle_saetze}
     for f in OUT.glob("*.mp3"):

@@ -179,6 +179,10 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
   Piper Thorsten bei 100 % behält die alten Dateinamen (keine neuen Aufnahmen nötig).
 - Wahl im Admin-Bereich unter „Einstellungen“ (Variante A): Programm-Umschalter, Stimmen mit Hörprobe und „Wählen“ (mit Rückgängig), Sprechtempo 80–120 %, Pause.
   `config.js` `settings.stimme = {programm, stimme, tempo}` (fehlt = Standard), geprüft in `cleanVoice` und im Helfer.
+- **Klangqualität (Oktober 2026):** MP3 in der Abtastrate der Rohaufnahme (Chatterbox 24 kHz) mit 96 kbit/s, vorher fest
+  22,05 kHz/64 kbit/s (Höhen gingen verloren); Piper Thorsten bei 100 % behält das alte Format und die alten Namen.
+  Chatterbox bekommt „ – “ als Komma (nur beim Sprechen). Vergleichsrunde mit vier Varianten (jetzt, am Stück,
+  ruhigere Vorlage, ruhigere Einstellungen): `hoerproben/vergleich-einstellungen/`.
 - **Vorlage tauschen:** Der Zwischenspeicher erkennt eine Stimme an ihrem Eintrag in `stimmen.json` (Dateiname der
   Vorlage), nicht am Inhalt der WAV-Datei. Eine neue Vorlage deshalb immer unter neuem Namen und als neuen Eintrag
   anlegen (z. B. `karlsson-echt`), nie `karlsson.wav` überschreiben, sonst gelten alte Rohaufnahmen weiter.
