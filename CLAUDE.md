@@ -156,7 +156,9 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
   `config.js` `settings.stimme = {programm, stimme, tempo}` (fehlt = Standard), geprüft in `cleanVoice` und im Helfer.
 - Wartezeiten: Pause sofort; Tempo etwa 1–2 Min. (umrechnen); neue Stimme einmal alle Sätze: Piper ~3 Min., XTTS ~30 s und
   Chatterbox ~60 s je Satz auf diesem Rechner; zurück zu einer benutzten Stimme schnell.
-- Entscheidungsvorlage mit allen Hörproben: `hoerproben/entscheidung/index.html` (lokal, von Git ausgenommen).
+- Entscheidungsvorlage mit allen Hörproben: `hoerproben/entscheidung/index.html` (lokal, von Git ausgenommen), auch als
+  private Seite auf claude.ai (fürs iPhone). Code auf Arbeitskopie `stimmen-wahl` (lokal gespeichert, Hochladen nur nach
+  OK); der Admin-Helfer läuft bereits mit diesem Stand. Erst den Code mergen, dann eine neue Stimme veröffentlichen.
   **Nach der Wahl des Inhabers:** das andere Programm löschen (Ordner `~/.local/share/meditation-xtts` bzw.
   `meditation-chatterbox`, seine Hörproben, Rohaufnahmen und Einträge in `stimmen.json`), `~/.pkuseg` gehört zu Chatterbox.
   Bei MLS-Stimmen (CC BY 4.0) Namensnennung in `datenschutz.html`; Herkunft in `stimme/QUELLE.md`.
