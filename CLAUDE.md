@@ -179,6 +179,10 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
   Piper Thorsten bei 100 % behält die alten Dateinamen (keine neuen Aufnahmen nötig).
 - Wahl im Admin-Bereich unter „Einstellungen“ (Variante A): Programm-Umschalter, Stimmen mit Hörprobe und „Wählen“ (mit Rückgängig), Sprechtempo 80–120 %, Pause.
   `config.js` `settings.stimme = {programm, stimme, tempo}` (fehlt = Standard), geprüft in `cleanVoice` und im Helfer.
+- **Gewählt nach der Vergleichsrunde (Inhaber, 8. Oktober 2026): Variante 3 „ruhigere Vorlage“** → Stimme
+  `chatterbox`/`karlsson-ruhig` (Vorlage mit Piper ×1,35 statt ×1,15 erzeugt), Einstellungen unverändert (Ausdruck 0,4,
+  Führung 0,3, Zufall 0,7), jeder Satz einzeln. Atemrest am Satzende stört den Inhaber: wird abgeschnitten
+  (`atemrest_weg`). Einzelne blecherne Laute (z. B. „D“ in „Du bist hier.“) mit „Neu sprechen“ beheben.
 - **Klangqualität (Oktober 2026):** MP3 in der Abtastrate der Rohaufnahme (Chatterbox 24 kHz) mit 96 kbit/s, vorher fest
   22,05 kHz/64 kbit/s (Höhen gingen verloren); Piper Thorsten bei 100 % behält das alte Format und die alten Namen.
   Chatterbox bekommt „ – “ als Komma (nur beim Sprechen). Vergleichsrunde mit vier Varianten (jetzt, am Stück,

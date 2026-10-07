@@ -233,7 +233,7 @@ class Stimme:
     def mp3(self, satz):
         if self.alt:
             schluessel = f"{ALT_SETTINGS}|{satz}"
-        else:   # v3: MP3 in der Abtastrate der Rohaufnahme mit 96 kbit/s (vorher 22 kHz, 64 kbit/s)
+        else:   # v3: Satzende ohne Atemrest, MP3 in der Abtastrate der Rohaufnahme mit 96 kbit/s (vorher 22 kHz, 64 kbit/s)
             schluessel = f"{self.kennung}|{self.tempo:.2f}|v3|{satz}"
         v = self.variante(satz)
         return self.out / (hashlib.sha1(f"{schluessel}{f'|{v}' if v else ''}".encode()).hexdigest()[:12] + ".mp3")
@@ -269,6 +269,38 @@ class Sprecher:
         self.p.wait(timeout=60)
 
 
+def atemrest_weg(roh, ziel):
+    """Satzende sauber (Inhaber, Oktober 2026: Chatterbox hängt oft einen Atemrest, ein Rauschen oder einen Klick an).
+    Gesucht wird der letzte echte Sprachabschnitt (mindestens 80 ms nicht leiser als 35 dB unter der lautesten Stelle);
+    sobald die Stimme danach unter 42 dB abgeklungen ist, wird nach 30 ms Nachklang mit 40 ms Ausblenden geschnitten.
+    Die Sprache selbst bleibt unverändert. Liefert die entfernten Millisekunden. Ohne Zusatzpakete (System-Python)."""
+    import array, math, wave
+    with wave.open(str(roh)) as w:
+        sr, kanaele, breite = w.getframerate(), w.getnchannels(), w.getsampwidth()
+        werte = array.array("h", w.readframes(w.getnframes()))
+    if kanaele != 1 or breite != 2 or not werte:
+        return 0
+    fr = sr // 100
+    pegel = [math.sqrt(sum(x * x for x in werte[i:i + fr]) / fr) for i in range(0, len(werte) - fr + 1, fr)]
+    spitze = max(pegel) or 1
+    rel = [20 * math.log10(p / spitze) if p > 0 else -200 for p in pegel]
+    ende, lauf = None, 0
+    for k, r in enumerate(rel):
+        lauf = lauf + 1 if r >= -35 else 0
+        if lauf >= 8:
+            ende = k + 1
+    if ende is None:
+        return 0
+    schnitt = next((k for k in range(ende, len(rel)) if rel[k] < -42), len(rel)) * fr + int(sr * 0.03)
+    schnitt = min(schnitt, len(werte))
+    blende = int(sr * 0.04)
+    for i in range(max(0, schnitt - blende), schnitt):
+        werte[i] = int(werte[i] * (schnitt - i) / blende)
+    with wave.open(str(ziel), "wb") as w:
+        w.setnchannels(1); w.setsampwidth(2); w.setframerate(sr); w.writeframes(werte[:schnitt].tobytes())
+    return round((len(werte) - schnitt) / sr * 1000)
+
+
 def umwandeln(roh, ziel, tempo, alt=False):
     """Rohaufnahme → MP3 für die App. Tempo mit Rubber Band (Tonhöhe bleibt), Stille vorn und hinten weg, Lautstärke
     angleichen, mono. Abtastrate wie die Rohaufnahme (Chatterbox 24 kHz, Piper 22,05 kHz) mit 96 kbit/s, damit keine
@@ -277,6 +309,12 @@ def umwandeln(roh, ziel, tempo, alt=False):
     import wave
     with wave.open(str(roh)) as w:
         rate = w.getframerate()
+    sauber = None
+    if not alt:   # die alten Piper-Dateien bleiben genau, wie sie sind
+        sauber = ziel.with_name(ziel.stem + ".ende.wav")
+        atemrest_weg(roh, sauber)
+        if sauber.exists():
+            roh = sauber
     filter_ = ([f"rubberband=tempo={tempo:.2f}:pitchq=quality"] if tempo != 1.0 else []) + [
         "silenceremove=start_periods=1:start_threshold=-50dB", "areverse",
         "silenceremove=start_periods=1:start_threshold=-50dB", "areverse",
@@ -285,6 +323,8 @@ def umwandeln(roh, ziel, tempo, alt=False):
     subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", str(roh), "-af", ",".join(filter_),
                     "-ar", "22050" if alt else str(rate), "-ac", "1", "-b:a", "64k" if alt else "96k", str(tmp)], check=True)
     tmp.replace(ziel)
+    if sauber:
+        sauber.unlink(missing_ok=True)
 
 
 def duration(path):
