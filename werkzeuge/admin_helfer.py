@@ -13,17 +13,24 @@ admin-helfer.log daneben).
   (außerhalb des Projekts, die letzten 500). POST /api/sicherungen listet sie, /api/wiederherstellen holt einen
   zurück (der Stand davor wird dabei selbst gesichert). Anlass: Am 6. Oktober 2026 gingen überarbeitete des Inhabers
   Texte verloren, weil Claude config.js nach Tests zurückgesetzt hat.
-- Automatische Vertonung (Inhaber, Oktober 2026): Nach jedem Speichern nimmt der Helfer im Hintergrund alle neuen oder
-  geänderten Sprüche mit der gewählten Stimme auf (werkzeuge/aufnahmen.py; Programm, Stimme und Tempo wählt der
-  Inhaber unter „Einstellungen“, die Auswahl steht in werkzeuge/stimmen.json). POST /api/aufnahme-status liefert den
-  Fortschritt für den Ladebalken im Admin-Bereich, POST /api/stimmen die Auswahl mit Hörproben. Wechselt die Stimme
-  oder das Tempo während einer Vertonung, bricht der Helfer sie ab und beginnt mit der neuen (schon Gesprochenes
-  bleibt im Zwischenspeicher).
-- POST /api/vorschau und /api/veroeffentlichen: „Für alle veröffentlichen“ (Sprüche, Klänge und Aufnahmen). Nie im Arbeitsordner (dort arbeitet
-  Claude oft auf einer anderen Arbeitskopie), sondern in einer eigenen Kopie des Originals:
+- Automatische Vertonung (Inhaber, Oktober 2026): Fehlt nach dem Speichern für einen Spruch die Aufnahme der gewählten
+  Stimme (neuer oder geänderter Text, andere Stimme, anderes Tempo, „Neu sprechen“), nimmt der Helfer sie im
+  Hintergrund auf (werkzeuge/aufnahmen.py; Programm, Stimme und Tempo wählt der Inhaber unter „Einstellungen“, die
+  Auswahl steht in werkzeuge/stimmen.json). Er wartet dafür kurz (WARTEN), damit mehrere Änderungen hintereinander ein
+  einziger Durchgang werden. Pause, Reihenfolge, An/Aus, Gruppen und Klänge brauchen keine Vertonung. Wechselt die
+  Stimme oder das Tempo während einer Vertonung, bricht der Helfer sie ab und beginnt mit der neuen (schon Gesprochenes
+  bleibt im Zwischenspeicher). POST /api/stimmen liefert die Auswahl mit Hörproben, /api/neu-sprechen eine neue
+  Variante eines Spruchs.
+- POST /api/status: alles für die Statuszeile des Admin-Bereichs (Variante A des Inhabers, Oktober 2026): Fortschritt
+  der Vertonung, fehlende Aufnahmen, Zahl der Änderungen, die noch nicht veröffentlicht sind, Stand des Veröffentlichens.
+- POST /api/vorschau und /api/veroeffentlichen: „Veröffentlichen“ (Sprüche, Klänge und Aufnahmen). Veröffentlicht wird
+  immer der gespeicherte Stand (config.js), nie der im Browser, und nur, wenn er vollständig vertont ist (Inhaber,
+  Oktober 2026). Läuft noch eine Vertonung, wartet der Auftrag und veröffentlicht danach von selbst. Nie im
+  Arbeitsordner (dort arbeitet Claude oft auf einer anderen Arbeitskopie), sondern in einer eigenen Kopie des Originals:
     1. lokal:  eigene Kopie (git worktree in KOPIE) auf den Stand von GitHub bringen (origin/main)
-    2. lokal:  Sprüche prüfen, Änderungen gegenüber der veröffentlichten config.js auflisten (fürs Fenster)
-    3. lokal:  nach „Ja“: config.js dort schreiben, Cache-Versionen setzen, speichern (Commit mit den Änderungen)
+    2. lokal:  Änderungen gegenüber der veröffentlichten config.js auflisten (fürs Fenster)
+    3. lokal:  nach „Ja“ und sobald alles vertont ist: config.js und Aufnahmen dort schreiben, Cache-Versionen setzen,
+               speichern (Commit mit den Änderungen)
     4. online: hochladen (Push auf main); GitHub Pages veröffentlicht in 1–10 Minuten
 - Schutz: nur auf diesem Rechner erreichbar; /api/ nur mit Host und Origin der eigenen Seite, eigenem Kopf
   X-Meditation: 1 und JSON. Andere Webseiten im selben Browser können so nichts speichern oder veröffentlichen.
@@ -43,6 +50,9 @@ import threading
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import aufnahmen  # noqa: E402  (Texte lesen, „alles vertont?“, „Neu sprechen“: dieselben Regeln wie beim Aufnehmen)
+
 ROOT = Path(__file__).resolve().parent.parent
 PORT = 8766
 MAX_BYTES = 1024 * 1024
@@ -59,6 +69,7 @@ DATEN = Path.home() / ".local" / "share"
 STIMMEN = Path(__file__).resolve().parent / "stimmen.json"
 STIMME_STANDARD = {"programm": "piper", "stimme": "thorsten", "tempo": 1.0}   # wie VOICE_DEFAULT in js/zustand.js
 HOERPROBEN = "hoerproben/entscheidung"
+WARTEN = 5   # Sekunden nach der letzten Änderung, bevor die Vertonung beginnt
 
 
 def stimmen_katalog():
@@ -165,7 +176,7 @@ def stimmen_liste(root):
                     "probe": f"{HOERPROBEN}/{s['probe']}" if (Path(root) / HOERPROBEN / s.get("probe", "-")).exists() else None}
                    for sid, s in p["stimmen"].items()]
         programme.append({"id": pid, "name": p["name"], "eingerichtet": p["eingerichtet"],
-                          "sekundenJeSatz": p["sekunden_je_satz"], "stimmen": stimmen})
+                          "sekundenJeSatz": p["sekunden_je_satz"], "variiert": bool(p.get("variiert")), "stimmen": stimmen})
     return {"ok": True, "programme": programme, "saetze": saetze}
 
 
@@ -261,11 +272,12 @@ def speichern(entwurf, ziel):
 
 
 # ---------- Automatische Vertonung ----------
-# Läuft im Hintergrund, immer nur einmal gleichzeitig. Kommt während einer Vertonung neues Speichern dazu, folgt
-# danach ein weiterer Durchgang mit dem neuen Stand (das Werkzeug nimmt nur auf, was noch fehlt).
-VERTONUNG = {"laeuft": False, "fertig": 0, "gesamt": 0, "aktuell": "", "fehler": "", "nochmal": False, "stand": 0,
-             "prozent": 0, "schritt": "", "rest": None, "stimme": "", "wahl": None, "prozess": None}
+# Läuft im Hintergrund, immer nur einmal gleichzeitig. Kommt während einer Vertonung neues Speichern dazu, liest der
+# laufende Durchgang die Texte vor jedem Satz neu; danach folgt nur dann ein weiterer, wenn noch etwas fehlt.
+VERTONUNG = {"laeuft": False, "geplant": False, "fertig": 0, "gesamt": 0, "aktuell": "", "fehler": "", "nochmal": False,
+             "stand": 0, "prozent": 0, "schritt": "", "rest": None, "stimme": "", "wahl": None, "prozess": None}
 VERTONUNG_SPERRE = threading.Lock()
+VERTONUNG_UHR = [None]   # Zeitgeber bis zum Beginn (WARTEN)
 
 
 def gewaehlte_stimme(root):
@@ -273,7 +285,18 @@ def gewaehlte_stimme(root):
     return {**STIMME_STANDARD, **((daten.get("settings") or {}).get("stimme") or {})}
 
 
-def vertonen_anstossen(root):
+def fehlende(root):
+    """Sprüche, denen eine Aufnahme der gewählten Stimme fehlt (leer = vollständig vertont)."""
+    try:
+        return aufnahmen.vertont(root)["fehlend"]
+    except Exception as e:   # z. B. Stimme nicht eingerichtet: dann eben vertonen und den Fehler dort zeigen
+        print(f"Prüfen der Aufnahmen: {e!r}", file=sys.stderr, flush=True)
+        return ["?"]
+
+
+def vertonen_anstossen(root, sofort=False):
+    """Nach dem Speichern: Vertonung nur, wenn etwas fehlt. Nicht sofort, sondern WARTEN Sekunden nach der letzten
+    Änderung (sofort: „Neu sprechen“, „Nochmal versuchen“, Veröffentlichen wartet)."""
     with VERTONUNG_SPERRE:
         if VERTONUNG["laeuft"]:
             VERTONUNG["nochmal"] = True
@@ -288,8 +311,26 @@ def vertonen_anstossen(root):
                 except OSError:
                     pass
             return
-        VERTONUNG.update(laeuft=True, fertig=0, gesamt=0, aktuell="", fehler="", nochmal=False, prozent=0,
-                         schritt="Vertonung startet", rest=None, stimme="")
+        if VERTONUNG_UHR[0]:
+            VERTONUNG_UHR[0].cancel()
+            VERTONUNG_UHR[0] = None
+        if not fehlende(root):
+            VERTONUNG.update(geplant=False, fehler="")
+            return
+        VERTONUNG["geplant"] = True
+        uhr = threading.Timer(0 if sofort else WARTEN, vertonung_starten, args=(root,))
+        uhr.daemon = True
+        VERTONUNG_UHR[0] = uhr
+        uhr.start()
+
+
+def vertonung_starten(root):
+    with VERTONUNG_SPERRE:
+        VERTONUNG_UHR[0] = None
+        if VERTONUNG["laeuft"]:
+            return
+        VERTONUNG.update(laeuft=True, geplant=False, fertig=0, gesamt=0, aktuell="", fehler="", nochmal=False,
+                         prozent=0, schritt="Vertonung startet", rest=None, stimme="")
     threading.Thread(target=vertonen, args=(root,), daemon=True).start()
 
 
@@ -326,13 +367,13 @@ def vertonen(root):
                 elif zeile == "PHASE stimme":
                     VERTONUNG.update(prozent=5, schritt="Sprachprogramm wird geladen", gesamt=sprechen)
                 elif m := re.match(r"\[(\d+)/(\d+)\] (.*)$", zeile):
-                    k = int(m.group(1))
+                    k, sprechen = int(m.group(1)), int(m.group(2))   # die Zahl kann sich unterwegs ändern
                     if beginn is None:
                         beginn = (time.monotonic(), k)
                     VERTONUNG.update(fertig=k, aktuell=m.group(3), schritt="Satz wird gesprochen",
                                      prozent=8 + (77 if gesamt else 84) * k // max(1, sprechen))
                 elif m := re.match(r"FERTIG (\d+)/(\d+)$", zeile):
-                    k = int(m.group(1))
+                    k, sprechen = int(m.group(1)), int(m.group(2))
                     VERTONUNG.update(fertig=k, prozent=8 + (77 if gesamt else 84) * k // max(1, sprechen))
                     if beginn and k > beginn[1]:
                         je_satz = (time.monotonic() - beginn[0]) / (k - beginn[1])
@@ -362,16 +403,29 @@ def vertonen(root):
         with VERTONUNG_SPERRE:
             VERTONUNG["prozess"] = None
             VERTONUNG["stand"] += 1   # die App lädt danach die Liste der Aufnahmen neu
-            if not VERTONUNG["nochmal"]:
+            # Noch einmal nur, wenn inzwischen gespeichert wurde und noch etwas fehlt (nie im Kreis bei einem Fehler)
+            if not VERTONUNG["nochmal"] or (not VERTONUNG.get("abgebrochen") and not fehlende(root)):
                 VERTONUNG.update(laeuft=False, aktuell="", rest=None)
                 return
             VERTONUNG.update(nochmal=False, fertig=0, gesamt=0, aktuell="", prozent=0, schritt="Vertonung startet",
                              rest=None)
 
 
-def aufnahme_status():
-    return {"ok": True, **{k: VERTONUNG[k] for k in ("laeuft", "fertig", "gesamt", "aktuell", "fehler", "stand",
-                                                      "prozent", "schritt", "rest", "stimme")}}
+def status(root):
+    """Alles für die Statuszeile: Vertonung, fehlende Aufnahmen, nicht veröffentlichte Änderungen, Veröffentlichen."""
+    return {"ok": True, **{k: VERTONUNG[k] for k in ("laeuft", "geplant", "fertig", "gesamt", "aktuell", "fehler",
+                                                      "stand", "prozent", "schritt", "rest", "stimme")},
+            "fehlend": len(fehlende(root)), "offen": offen_zaehlen(root),
+            "veroeffentlichen": {k: AUFTRAG[k] for k in ("zustand", "meldung", "stand", "aenderungen")}}
+
+
+def neu_sprechen(entwurf, root):
+    text = entwurf.get("text")
+    if not isinstance(text, str) or text not in {t for t, _ in aufnahmen.texte_lesen(root)[0]}:
+        raise Fehler("Diesen Spruch gibt es nicht (mehr).")
+    aufnahmen.neu_sprechen(text, root)
+    vertonen_anstossen(root, sofort=True)
+    return status(root)
 
 
 AUFNAHMEN_BLOCK = re.compile(r"(  // Aufnahmen \(setzt werkzeuge/aufnahmen\.py\)\n).*?(  // Ende Aufnahmen\n)", re.S)
@@ -518,30 +572,129 @@ def unterschiede(alt, neu, grund):
     return zeilen
 
 
+GRUNDBESTAND = [{}]   # Grundbestand aus der Seite (texte.js), falls noch nie etwas veröffentlicht wurde
+
+
 def grundbestand(entwurf):
     g = entwurf.get("defaults")
-    return g if isinstance(g, dict) else {}
+    if isinstance(g, dict):
+        GRUNDBESTAND[0] = g
+    return GRUNDBESTAND[0]
+
+
+def gespeichert(root):
+    """Der gespeicherte Stand (config.js), geprüft. Ohne config.js der Grundbestand."""
+    daten = config_lesen(Path(root) / "config.js")
+    return pruefen(daten if daten else {"sayings": GRUNDBESTAND[0], "sounds": {}, "settings": {}})
+
+
+# Zahl der nicht veröffentlichten Änderungen für den Knopf, ohne Internet: verglichen wird mit dem zuletzt von GitHub
+# geholten Stand (origin/main im Arbeitsordner; beim Öffnen des Admin-Bereichs und nach dem Veröffentlichen geholt).
+OFFEN_ZWISCHEN = {"schluessel": None, "zahl": 0}
+
+
+def offen_zaehlen(root):
+    root = Path(root)
+    try:
+        main = git("rev-parse", "-q", "--verify", "origin/main", cwd=root)
+        liste = root / "js/aufnahmen.js"
+        schluessel = (main, fingerabdruck(root / "config.js"), liste.stat().st_mtime_ns if liste.exists() else 0)
+        if schluessel == OFFEN_ZWISCHEN["schluessel"]:
+            return OFFEN_ZWISCHEN["zahl"]
+        alt_text = git("show", "origin/main:config.js", cwd=root)
+        m = re.search(r"window\.MEDITATION_CONFIG\s*=\s*(.*);\s*$", alt_text, re.S)
+        alt = json.loads(m.group(1)) if m else None
+        zahl = len(unterschiede(alt, gespeichert(root), GRUNDBESTAND[0]))
+        online = set(git("ls-tree", "--name-only", "origin/main", "stimme/", cwd=root).split())
+        hier = {f"stimme/{f.name}" for f in (root / "stimme").glob("*.mp3")}
+        if online != hier:
+            zahl += 1   # „Aufnahmen: …“
+        OFFEN_ZWISCHEN.update(schluessel=schluessel, zahl=zahl)
+        return zahl
+    except (Fehler, OSError, ValueError):
+        return None   # unbekannt (z. B. noch nicht mit GitHub verbunden)
+
+
+def abgleichen(entwurf, root):
+    """Beim Öffnen des Admin-Bereichs: den Stand von GitHub im Hintergrund holen, damit die Zahl stimmt."""
+    grundbestand(entwurf)
+
+    def holen():
+        try:
+            git("fetch", "-q", "origin", "main", cwd=root, timeout=90)
+        except Fehler:
+            pass
+    threading.Thread(target=holen, daemon=True).start()
+    return {"ok": True}
 
 
 def vorschau(entwurf, repo, kopie):
     with SPERRE:
-        neu = pruefen(entwurf)
+        neu = gespeichert(repo)
         kopie_aktualisieren(repo, kopie)
-        if VERTONUNG["laeuft"]:
-            raise Fehler("Die Vertonung läuft noch. Bitte warten, bis der Ladebalken fertig ist.")
+        fehlt = fehlende(repo)
         return {"ok": True, "aenderungen": unterschiede(config_lesen(kopie / "config.js"), neu, grundbestand(entwurf))
-                + vorschau_aufnahmen(repo, kopie)}
+                + vorschau_aufnahmen(repo, kopie), "fehlend": len(fehlt),
+                "vertonung": VERTONUNG["laeuft"] or VERTONUNG["geplant"]}
+
+
+# Auftrag „Veröffentlichen“: wartet, bis alles vertont ist, dann veröffentlicht er von selbst (Inhaber, Oktober 2026:
+# nur vollständig Vertontes geht online). zustand: "" | wartet | laeuft | fertig | fehler
+AUFTRAG = {"zustand": "", "meldung": "", "stand": "", "aenderungen": [], "nummer": 0}
 
 
 def veroeffentlichen(entwurf, repo, kopie):
+    grundbestand(entwurf)
+    if AUFTRAG["zustand"] in ("wartet", "laeuft"):
+        return {"ok": True}
+    AUFTRAG.update(zustand="wartet", meldung="", stand="", aenderungen=[], nummer=AUFTRAG["nummer"] + 1)
+    threading.Thread(target=auftrag_ausfuehren, args=(repo, kopie, AUFTRAG["nummer"]), daemon=True).start()
+    return {"ok": True}
+
+
+def veroeffentlichen_abbrechen(entwurf):
+    if AUFTRAG["zustand"] == "wartet":
+        AUFTRAG.update(zustand="", nummer=AUFTRAG["nummer"] + 1)
+    return {"ok": True}
+
+
+def auftrag_ausfuehren(repo, kopie, nummer):
+    angestossen = False
+    while AUFTRAG["nummer"] == nummer:
+        if VERTONUNG["laeuft"] or VERTONUNG["geplant"]:
+            time.sleep(1)
+            continue
+        if fehlende(repo):
+            if VERTONUNG["fehler"] and angestossen:
+                AUFTRAG.update(zustand="fehler", meldung="Nicht veröffentlicht: Die Vertonung ist nicht fertig geworden "
+                               f"({VERTONUNG['fehler']}).")
+                return
+            vertonen_anstossen(repo, sofort=True)   # sollte schon laufen; sonst jetzt
+            angestossen = True
+            time.sleep(1)
+            continue
+        AUFTRAG["zustand"] = "laeuft"
+        try:
+            r = jetzt_veroeffentlichen(repo, kopie)
+            if r is None:   # inzwischen wieder geändert: weiter warten, bis auch das vertont ist
+                AUFTRAG["zustand"] = "wartet"
+                continue
+            AUFTRAG.update(zustand="fertig", stand=r.get("stand", ""), aenderungen=r["aenderungen"],
+                           meldung="" if r["aenderungen"] else "Es gab nichts Neues.")
+        except (Fehler, subprocess.SubprocessError, OSError) as e:
+            AUFTRAG.update(zustand="fehler", meldung=str(e))
+        return
+
+
+def jetzt_veroeffentlichen(repo, kopie):
     with SPERRE:
-        neu = pruefen(entwurf)
+        neu = gespeichert(repo)
         kopie_aktualisieren(repo, kopie)
-        if VERTONUNG["laeuft"]:
-            raise Fehler("Die Vertonung läuft noch. Bitte warten, bis der Ladebalken fertig ist.")
-        aenderungen = unterschiede(config_lesen(kopie / "config.js"), neu, grundbestand(entwurf))
+        if VERTONUNG["laeuft"] or VERTONUNG["geplant"] or fehlende(repo):   # inzwischen wieder geändert
+            return None
+        aenderungen = unterschiede(config_lesen(kopie / "config.js"), neu, GRUNDBESTAND[0])
         if not aenderungen and not vorschau_aufnahmen(repo, kopie):
-            return {"ok": True, "aenderungen": [], "schritte": ["geprueft"]}
+            return {"ok": True, "aenderungen": []}
         try:
             (kopie / "config.js").write_text(config_text(neu), encoding="utf-8")
             zeile = aufnahmen_uebernehmen(repo, kopie)
@@ -566,7 +719,7 @@ def veroeffentlichen(entwurf, repo, kopie):
             git("fetch", "-q", "origin", "main", cwd=repo, timeout=90)   # damit auch der Arbeitsordner es weiß
         except Fehler:
             pass
-        return {"ok": True, "aenderungen": aenderungen, "stand": stand, "schritte": ["geprueft", "gespeichert", "hochgeladen"]}
+        return {"ok": True, "aenderungen": aenderungen, "stand": stand}
 
 
 # ---------- Webserver ----------
@@ -626,13 +779,17 @@ class Helfer(http.server.SimpleHTTPRequestHandler):
             return ergebnis
 
         aktionen = {"/api/speichern": speichern_und_vertonen,
-                    "/api/aufnahme-status": lambda e: aufnahme_status(),
+                    "/api/status": lambda e: status(self.root),
+                    "/api/aufnahme-status": lambda e: status(self.root),   # alter Name (offene Seiten)
+                    "/api/abgleich": lambda e: abgleichen(e, self.root),
+                    "/api/neu-sprechen": lambda e: neu_sprechen(e, self.root),
+                    "/api/veroeffentlichen-abbrechen": veroeffentlichen_abbrechen,
                     "/api/stimmen": lambda e: stimmen_liste(self.root),
                     "/api/stand": lambda e: {"ok": True, "stand": fingerabdruck(self.root / "config.js")},
                     "/api/sicherungen": lambda e: sicherungen_liste(),
                     "/api/wiederherstellen": lambda e: (wiederherstellen(e, self.root / "config.js"),
                                                         vertonen_anstossen(self.root))[0],
-                    "/api/vertonen": lambda e: (vertonen_anstossen(self.root), aufnahme_status())[1],
+                    "/api/vertonen": lambda e: (vertonen_anstossen(self.root, sofort=True), status(self.root))[1],
                     "/api/vorschau": lambda e: vorschau(e, self.root, self.kopie),
                     "/api/veroeffentlichen": lambda e: veroeffentlichen(e, self.root, self.kopie)}
         if pfad not in aktionen:

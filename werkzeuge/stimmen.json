@@ -1,5 +1,5 @@
 {
- "_info": "Welche Programme und Stimmen werkzeuge/aufnahmen.py kennt. Gewählt wird im Admin-Bereich (Einstellungen, config.js settings.stimme). Programme liegen außerhalb des Projekts unter ~/.local/share/<ordner> (eigene Python-Umgebung venv/, Modell in modell/), Stimm-Vorlagen in ~/.local/share/meditation-app/vorlagen. Nur Stimmen, die für Sprachsynthese freigegeben sind, keine Stimmen realer Privatpersonen. Ändert sich ein Eintrag, werden die Sätze dieser Stimme neu gesprochen.",
+ "_info": "Welche Programme und Stimmen werkzeuge/aufnahmen.py kennt. Gewählt wird im Admin-Bereich (Einstellungen, config.js settings.stimme). Programme liegen außerhalb des Projekts unter ~/.local/share/<ordner> (eigene Python-Umgebung venv/, Modell in modell/), Stimm-Vorlagen in ~/.local/share/meditation-app/vorlagen. Nur Stimmen, die für Sprachsynthese freigegeben sind, keine Stimmen realer Privatpersonen. Ändert sich ein Eintrag, werden die Sätze dieser Stimme neu gesprochen. variiert: Das Programm klingt bei jedem Sprechen etwas anders, dann bietet der Admin-Bereich „Neu sprechen“ an.",
  "piper": {
   "name": "Piper",
   "ordner": "meditation-stimme",
@@ -16,6 +16,7 @@
   "name": "Chatterbox",
   "ordner": "meditation-chatterbox",
   "sekunden_je_satz": 60,
+  "variiert": true,
   "stimmen": {
    "thorsten": {"name": "Thorsten", "vorlage": "thorsten.wav", "probe": "chatterbox-1-thorsten.mp3"},
    "thorsten-schlaefrig": {"name": "Thorsten schläfrig", "vorlage": "thorsten-schlaefrig.wav", "probe": "chatterbox-2-thorsten-schlaefrig.mp3"},

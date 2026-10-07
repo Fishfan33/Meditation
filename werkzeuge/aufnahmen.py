@@ -8,11 +8,18 @@ Angabe Piper „Thorsten“, etwas langsamer (Wahl des Inhabers „A2“, Oktobe
 werkzeuge/stimmen.json, gesprochen wird mit werkzeuge/sprecher.py in der Python-Umgebung des Programms.
 
 Ablauf (so schnell wie möglich, Wunsch des Inhabers):
-- Die Sätze kommen aus der App selbst: Chromium lädt phasen.js, texte.js, config.js und zustand.js und gibt
-  alle Sprüche und die Einstellungen aus (Fassung des Inhabers aus dem Admin-Bereich, auch deaktivierte Sprüche).
+- Die Sätze kommen aus config.js (Fassung des Inhabers aus dem Admin-Bereich, auch deaktivierte Sprüche; der
+  Admin-Helfer hat sie mit denselben Regeln wie die App geprüft). Nur ohne config.js lädt Chromium den Grundbestand
+  aus der App selbst (phasen.js, texte.js, zustand.js).
 - Jeder Satz wird einmal gesprochen und als Rohaufnahme zwischengespeichert (~/.local/share/meditation-app/
   rohaufnahmen/<programm>-<stimme>/). Neu gesprochen wird nur, was es für diese Stimme noch nicht gibt: ein neuer
   oder geänderter Satz, oder eine Stimme, die noch nie benutzt wurde. Zurück zu einer früheren Stimme geht schnell.
+  Rohaufnahmen werden nie gelöscht: Rückgängig oder ein früherer Stand brauchen so keine neue Vertonung (bei
+  Chatterbox kostet jeder Satz etwa eine Minute).
+- Vor jedem Satz liest das Werkzeug die Texte neu (Admin-Bereich, Oktober 2026): Was inzwischen geändert oder
+  gelöscht wurde, wird nicht mehr gesprochen, Neues kommt gleich dran. Sätze aktiver Sprüche zuerst.
+- „Neu sprechen“ (Admin-Bereich, bei Chatterbox): In neu.json im Ordner der Rohaufnahmen zählt je Satz eine Variante
+  hoch. Sie steckt im Zufall des Sprachprogramms und in den Dateinamen, also entsteht eine neue Aufnahme.
 - Aus der Rohaufnahme wird die MP3 für die App: Tempo (tonhöhenerhaltend, ohne neu zu sprechen), Stille am Anfang
   und Ende entfernt, Lautstärke angeglichen, nach stimme/<prüfsumme>.mp3. Der Name hängt an Text, Stimme und Tempo.
 - Die Pause zwischen den Sätzen setzt die App beim Abspielen ein; dafür muss nichts neu aufgenommen werden.
@@ -22,6 +29,7 @@ Ablauf (so schnell wie möglich, Wunsch des Inhabers):
 """
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -35,11 +43,37 @@ from sprecher import PARAMETER, katalog, python_fuer  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "stimme"
-ROH = Path.home() / ".local/share/meditation-app/rohaufnahmen"
+# Für Tests ein eigener Zwischenspeicher (MEDITATION_ROH), damit sie den echten nicht füllen
+ROH = Path(os.environ.get("MEDITATION_ROH") or Path.home() / ".local/share/meditation-app/rohaufnahmen")
+PHASEN = ["einstimmung", "bodyscan", "kraftort", "unterbewusst", "rueckkehr"]   # wie PHASES in js/phasen.js
 PROTOKOLL = Path.home() / ".local/share/meditation-app/sprecher.log"
 STANDARD = {"programm": "piper", "stimme": "thorsten", "tempo": 1.0}
 # Bisherige Dateinamen der ersten Stimme (Piper Thorsten A2), damit vorhandene Aufnahmen gültig bleiben
 ALT_SETTINGS = "thorsten-high|1.25|0.7|v1"
+
+
+def texte_lesen(root=None):
+    """Alle Sprüche in der Reihenfolge der App, ohne Doppelte, als [(Text, aktiv)], und die gewählte Stimme. Aus
+    config.js (schnell, wird vor jedem Satz neu gelesen); ohne config.js der Grundbestand über Chromium."""
+    root = Path(root or ROOT)
+    daten = None
+    try:
+        m = re.search(r"window\.MEDITATION_CONFIG\s*=\s*(.*);\s*$", (root / "config.js").read_text(encoding="utf-8"), re.S)
+        daten = json.loads(m.group(1)) if m else None
+    except (OSError, ValueError):
+        pass
+    if not isinstance(daten, dict) or not isinstance(daten.get("sayings"), dict):
+        texte, wahl = texts_from_app()
+        return [(t, True) for t in texte], wahl
+    eintraege = {}
+    for p in PHASEN:
+        for e in daten["sayings"].get(p) or []:
+            gruppe = isinstance(e, dict) and isinstance(e.get("items"), list)
+            for x in e["items"] if gruppe else [e]:
+                if isinstance(x, dict) and isinstance(x.get("text"), str) and x["text"].strip():
+                    aktiv = x.get("active") is not False and (not gruppe or e.get("active") is not False)
+                    eintraege[x["text"]] = eintraege.get(x["text"], False) or aktiv
+    return list(eintraege.items()), {**STANDARD, **(((daten.get("settings") or {}).get("stimme")) or {})}
 
 
 def texts_from_app():
@@ -84,10 +118,57 @@ def saetze(text):
     return teile
 
 
+def satz_kennung(satz):
+    return hashlib.sha1(satz.encode()).hexdigest()[:16]
+
+
+def neu_sprechen(text, root=None):
+    """„Neu sprechen“ für einen Spruch mit der gewählten Stimme: je Satz die nächste Variante (neu.json)."""
+    _, wahl = texte_lesen(root)
+    stimme = Stimme(wahl, root)
+    stimme.roh_ordner.mkdir(parents=True, exist_ok=True)
+    for z in saetze(text):
+        stimme.varianten[satz_kennung(z)] = stimme.variante(z) + 1
+    datei = stimme.roh_ordner / "neu.json"
+    tmp = datei.with_suffix(".tmp")
+    tmp.write_text(json.dumps(stimme.varianten), encoding="utf-8")
+    tmp.replace(datei)
+
+
+def aufnahmen_lesen(root=None):
+    """Liste aus js/aufnahmen.js: Spruch → [[Datei, Sekunden], …] (ältere Form [Datei, Sekunden] umgeformt)."""
+    try:
+        roh = re.search(r"self\.RECORDINGS\s*=\s*(.*);\s*$", (Path(root or ROOT) / "js/aufnahmen.js").read_text(encoding="utf-8"), re.S)
+        liste = json.loads(roh.group(1))
+        return {t: ([w] if isinstance(w[0], str) else w) for t, w in liste.items()}
+    except (OSError, AttributeError, ValueError, IndexError, TypeError):
+        return {}
+
+
+def vertont(root=None):
+    """Ist alles vertont? Für den Admin-Helfer: Vertonung nur starten, wenn etwas fehlt, und nur veröffentlichen, was
+    vollständig vertont ist. Ein Spruch gilt als vertont, wenn die Liste für jeden seiner Sätze genau die Aufnahme der
+    gewählten Stimme (mit Tempo und Variante) nennt und die Datei da ist. Liefert die Texte, denen etwas fehlt."""
+    root = Path(root or ROOT)
+    eintraege, wahl = texte_lesen(root)
+    try:
+        stimme = Stimme(wahl, root)
+    except SystemExit as e:
+        return {"fehlend": [t for t, _ in eintraege], "gesamt": len(eintraege), "fehler": str(e)}
+    liste = aufnahmen_lesen(root)
+    fehlend = []
+    for t, _ in eintraege:
+        soll = [f"stimme/{stimme.mp3(z).name}" for z in saetze(t)]
+        ist = [d for d, _ in liste.get(t, [])]
+        if ist != soll or not all((root / d).is_file() for d in soll):
+            fehlend.append(t)
+    return {"fehlend": fehlend, "gesamt": len(eintraege)}
+
+
 class Stimme:
     """Die gewählte Stimme: wo ihre Rohaufnahmen liegen und wie die MP3-Dateien heißen."""
 
-    def __init__(self, wahl):
+    def __init__(self, wahl, root=None):
         programme = katalog()
         if wahl["programm"] not in programme or wahl["stimme"] not in programme[wahl["programm"]]["stimmen"]:
             sys.exit(f"Unbekannte Stimme {wahl['programm']}/{wahl['stimme']} (werkzeuge/stimmen.json)")
@@ -99,16 +180,30 @@ class Stimme:
                                    PARAMETER[self.programm]], sort_keys=True)
         self.roh_ordner = ROH / f"{self.programm}-{self.name}"
         self.alt = (self.programm, self.name, self.tempo) == ("piper", "thorsten", 1.0)
+        self.out = Path(root or ROOT) / "stimme"
+        self.varianten_laden()
+
+    def varianten_laden(self):
+        """neu.json: je Satz (Kurzname) die wievielte Variante gilt; fehlt = 0 (die erste Aufnahme)."""
+        try:
+            self.varianten = json.loads((self.roh_ordner / "neu.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            self.varianten = {}
+
+    def variante(self, satz):
+        return int(self.varianten.get(satz_kennung(satz), 0))
 
     def roh(self, satz):
-        return self.roh_ordner / (hashlib.sha1(f"{self.kennung}|{satz}".encode()).hexdigest()[:16] + ".wav")
+        v = self.variante(satz)
+        return self.roh_ordner / (hashlib.sha1(f"{self.kennung}|{satz}{f'|{v}' if v else ''}".encode()).hexdigest()[:16] + ".wav")
 
     def mp3(self, satz):
         if self.alt:
             schluessel = f"{ALT_SETTINGS}|{satz}"
         else:
             schluessel = f"{self.kennung}|{self.tempo:.2f}|v2|{satz}"
-        return OUT / (hashlib.sha1(schluessel.encode()).hexdigest()[:12] + ".mp3")
+        v = self.variante(satz)
+        return self.out / (hashlib.sha1(f"{schluessel}{f'|{v}' if v else ''}".encode()).hexdigest()[:12] + ".mp3")
 
 
 class Sprecher:
@@ -131,9 +226,9 @@ class Sprecher:
             self.p.kill()
             sys.exit(f"Das Sprachprogramm ist abgebrochen (Einzelheiten: {PROTOKOLL})")
 
-    def sprechen(self, satz, ziel):
+    def sprechen(self, satz, ziel, variante=0):
         ziel.parent.mkdir(parents=True, exist_ok=True)
-        self.p.stdin.write(json.dumps({"text": satz, "ziel": str(ziel)}, ensure_ascii=False) + "\n")
+        self.p.stdin.write(json.dumps({"text": satz, "ziel": str(ziel), "variante": variante}, ensure_ascii=False) + "\n")
         self.antwort("OK")
 
     def ende(self):
@@ -160,6 +255,11 @@ def duration(path):
     return round(float(out), 2)
 
 
+def reihenfolge(eintraege):
+    """Alle Sätze ohne Doppelte: erst die aktiver Sprüche (in der Reihenfolge der App), dann die übrigen."""
+    return list(dict.fromkeys([z for t, a in eintraege if a for z in saetze(t)] + [z for t, _ in eintraege for z in saetze(t)]))
+
+
 def main():
     OUT.mkdir(exist_ok=True)
     # Nie zwei Vertonungen gleichzeitig (z. B. nach einem Neustart des Admin-Helfers): die zweite wartet
@@ -170,23 +270,40 @@ def main():
     #   PHASE lesen | STIMME Name | GESAMT n (MP3 zu erzeugen) | SPRECHEN m (davon neu zu sprechen)
     #   PHASE stimme (Programm lädt) | [k/m] Satz (wird gesprochen) | FERTIG k/m
     #   PHASE umwandeln | UMWANDELN i/n | PHASE liste | LISTE i/j | ENDE
+    # m kann sich unterwegs ändern: Vor jedem Satz werden die Texte neu gelesen.
     print("PHASE lesen", flush=True)
-    texts, wahl = texts_from_app()
+    eintraege, wahl = texte_lesen()
     stimme = Stimme(wahl)
     print(f"STIMME {stimme.titel}", flush=True)
-    alle_saetze = list(dict.fromkeys(z for t in texts for z in saetze(t)))
-    todo = [z for z in alle_saetze if not stimme.mp3(z).exists()]
-    sprechen = [z for z in todo if not stimme.roh(z).exists()]
+
+    def offen():
+        alle = reihenfolge(eintraege)
+        return [z for z in alle if not stimme.mp3(z).exists() and not stimme.roh(z).exists()]
+
+    todo = [z for z in reihenfolge(eintraege) if not stimme.mp3(z).exists()]
+    sprechen = offen()
     print(f"GESAMT {len(todo)}", flush=True)
     print(f"SPRECHEN {len(sprechen)}", flush=True)
-    if sprechen:
-        print("PHASE stimme", flush=True)
-        sprecher = Sprecher(stimme)
-        for k, z in enumerate(sprechen, 1):
-            print(f"[{k - 1}/{len(sprechen)}] {z}", flush=True)
-            sprecher.sprechen(z, stimme.roh(z))
-            print(f"FERTIG {k}/{len(sprechen)}", flush=True)
+    sprecher, gesprochen = None, 0
+    while sprechen:
+        if sprecher is None:
+            print("PHASE stimme", flush=True)
+            sprecher = Sprecher(stimme)
+        z = sprechen[0]
+        n = gesprochen + len(sprechen)
+        print(f"[{gesprochen}/{n}] {z}", flush=True)
+        sprecher.sprechen(z, stimme.roh(z), stimme.variante(z))
+        gesprochen += 1
+        # Texte und Varianten neu lesen: Geändertes fällt weg, Neues kommt dazu. Wechselt die Stimme, bricht der
+        # Admin-Helfer diesen Lauf ab und beginnt neu.
+        eintraege, _ = texte_lesen()
+        stimme.varianten_laden()
+        sprechen = offen()
+        print(f"FERTIG {gesprochen}/{gesprochen + len(sprechen)}", flush=True)
+    if sprecher:
         sprecher.ende()
+    alle_saetze = reihenfolge(eintraege)
+    todo = [z for z in alle_saetze if not stimme.mp3(z).exists()]
     if todo:
         print("PHASE umwandeln", flush=True)
         with ThreadPoolExecutor(4) as pool:   # ffmpeg je Satz, vier gleichzeitig
@@ -196,22 +313,10 @@ def main():
     for f in OUT.glob("*.mp3"):
         if f.name not in keep:
             f.unlink()
-    # Rohaufnahmen dieser Stimme zu Sätzen, die es nicht mehr gibt, weg; andere Stimmen bleiben (schneller zurück)
-    roh_keep = {stimme.roh(z).name for z in alle_saetze}
-    for f in stimme.roh_ordner.glob("*.wav"):
-        if f.name not in roh_keep:
-            f.unlink()
 
     # Längen: aus der bisherigen Liste übernehmen, nur neue Aufnahmen messen
     print("PHASE liste", flush=True)
-    bekannt = {}
-    try:
-        alt = json.loads(re.search(r"self\.RECORDINGS\s*=\s*(.*);\s*$", (ROOT / "js/aufnahmen.js").read_text(), re.S).group(1))
-        for wert in alt.values():   # alte Liste: [Datei, Sek]; neue: [[Datei, Sek], …]
-            for datei, sek in ([wert] if isinstance(wert[0], str) else wert):
-                bekannt[datei] = sek
-    except (OSError, AttributeError, ValueError, IndexError, TypeError):
-        pass
+    bekannt = {datei: sek for wert in aufnahmen_lesen().values() for datei, sek in wert}
     name = lambda z: f"stimme/{stimme.mp3(z).name}"   # noqa: E731
     neu = [z for z in alle_saetze if name(z) not in bekannt]
     with ThreadPoolExecutor(4) as pool:
@@ -219,6 +324,7 @@ def main():
             bekannt[name(z)] = sek
             print(f"LISTE {i}/{len(neu)}", flush=True)
     # Je Spruch die Sätze in Reihenfolge: [[Datei, Sekunden], …]
+    texts = [t for t, _ in eintraege]
     rec = {t: [[name(z), bekannt[name(z)]] for z in saetze(t)] for t in texts}
     # Erst in eine Nachbardatei, dann austauschen: Die App liest nie eine halb geschriebene Liste
     ziel = ROOT / "js/aufnahmen.js"
@@ -239,7 +345,7 @@ def main():
     (ROOT / "sw.js").write_text(sw)
     size = sum(f.stat().st_size for f in OUT.glob("*.mp3"))
     print(f"{stimme.titel}, Tempo {stimme.tempo:.2f}: {len(texts)} Sprüche, {len(alle_saetze)} Sätze, "
-          f"{len(sprechen)} neu gesprochen, {len(todo)} umgewandelt, zusammen {size / 1e6:.1f} MB")
+          f"{gesprochen} neu gesprochen, {len(todo)} umgewandelt, zusammen {size / 1e6:.1f} MB")
     print("ENDE", flush=True)
 
 

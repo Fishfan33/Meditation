@@ -4,7 +4,8 @@
     <ordner>/venv/bin/python werkzeuge/sprecher.py <programm> <stimme>
 
 Läuft in der Python-Umgebung des jeweiligen Programms (~/.local/share/<ordner>/venv, siehe werkzeuge/stimmen.json),
-lädt das Modell einmal und liest dann je Zeile einen Auftrag {"text": …, "ziel": …} von der Standardeingabe. Für jeden
+lädt das Modell einmal und liest dann je Zeile einen Auftrag {"text": …, "ziel": …, "variante": n} von der
+Standardeingabe (variante > 0: „Neu sprechen“ im Admin-Bereich, anderer Zufall). Für jeden
 Satz schreibt es eine WAV-Datei (mono, 16 bit, Abtastrate des Modells) und antwortet mit einer Zeile „OK“; nach dem
 Laden kommt „BEREIT“. Keine Netzverbindung: Modelle und Vorlagen liegen auf diesem Rechner.
 """
@@ -41,9 +42,10 @@ def python_fuer(programm):
     return DATEN / katalog()[programm]["ordner"] / "venv/bin/python"
 
 
-def samen(text):
-    """Gleicher Satz, gleicher Zufall: Ein neu gesprochener Satz klingt wie zuvor."""
-    return int(hashlib.sha1(text.encode()).hexdigest()[:8], 16)
+def samen(text, variante=0):
+    """Gleicher Satz, gleicher Zufall: Ein neu gesprochener Satz klingt wie zuvor. Eine neue Variante („Neu sprechen“)
+    nimmt einen anderen Zufall."""
+    return int(hashlib.sha1((f"{text}|{variante}" if variante else text).encode()).hexdigest()[:8], 16)
 
 
 def wav_schreiben(ziel, daten, sr):
@@ -66,7 +68,7 @@ def piper(stimme, ordner):
     cfg = SynthesisConfig(length_scale=stimme.get("length_scale", 1.0), speaker_id=sid)
     pause = PARAMETER["piper"]["satzpause"]
 
-    def sprechen(text, ziel):
+    def sprechen(text, ziel, variante=0):   # Piper klingt immer gleich, die Variante ändert nichts
         teile, sr = [], 22050
         for chunk in voice.synthesize(text, syn_config=cfg):
             if teile:   # Piper teilt selbst noch einmal (z. B. nach „z. B.“): kurze Pause dazwischen
@@ -87,8 +89,8 @@ def chatterbox(stimme, ordner):
     p = {k: v for k, v in PARAMETER["chatterbox"].items() if k != "v"}
     m.prepare_conditionals(str(VORLAGEN / stimme["vorlage"]), exaggeration=p["exaggeration"])
 
-    def sprechen(text, ziel):
-        torch.manual_seed(samen(text))
+    def sprechen(text, ziel, variante=0):
+        torch.manual_seed(samen(text, variante))
         y = m.generate(text, language_id="de", **p).squeeze().numpy()
         wav_schreiben(ziel, float_zu_int16(y), m.sr)
     return sprechen
@@ -108,7 +110,7 @@ def main():
     for zeile in sys.stdin:
         if zeile.strip():
             auftrag = json.loads(zeile)
-            sprechen(auftrag["text"], Path(auftrag["ziel"]))
+            sprechen(auftrag["text"], Path(auftrag["ziel"]), int(auftrag.get("variante") or 0))
             print("OK", file=antwort, flush=True)
 
 

@@ -9,6 +9,9 @@
 // Schalter (aktiv), Bleistift (bearbeiten, mit Phase und Gruppe), Papierkorb (mit Rückgängig). Die Reihenfolge
 // ist die Standard-Reihenfolge beim Vorlesen (Inhaber). Jede Änderung gilt sofort und wird über den Admin-Helfer in
 // config.js gespeichert (werkzeuge/admin_helfer.py); ohne Helfer nur bis zum Neuladen.
+// Ablauf (Inhaber, Oktober 2026): ändern → von selbst speichern → der Helfer vertont von selbst, was fehlt → mit einem
+// Klick veröffentlichen; online geht nur der gespeicherte und vollständig vertonte Stand. Eine Statuszeile oben zeigt
+// alle drei Schritte (Variante A des Inhabers).
 
 // ---------- Umgebung ----------
 // Nur lokal: als Datei oder über localhost. In der veröffentlichten Version bleibt der Knopf unsichtbar.
@@ -128,7 +131,7 @@ async function saveNow() {
     admStatus.className = "adm-status ok";
     dropDraft();
     showAlert("");
-    watchRecording();   // der Helfer vertont jetzt neue oder geänderte Sprüche
+    refreshStatus();   // der Helfer vertont jetzt, was fehlt; der Knopf zählt die offenen Änderungen
   } catch {
     saveFailed("Der Admin-Helfer antwortet nicht.");
   }
@@ -156,14 +159,18 @@ function withUndo(msg, action, opts) {
   }, opts);
 }
 
-// ---------- Vertonung (Ladebalken) ----------
-// Nach jedem Speichern nimmt der Admin-Helfer neue oder geänderte Sprüche mit der gewählten Stimme auf (Inhaber). Solange
-// das läuft, fragt der Admin-Bereich jede Sekunde nach dem Fortschritt; danach lädt er die Liste der Aufnahmen
-// neu (genaue Dauer, Wiedergabe der Aufnahme statt der Browser-Stimme).
-let recState = { laeuft: false, fertig: 0, gesamt: 0, aktuell: "", fehler: "", stand: 0, rest: null, stimme: "" };
-let recTimer = null, recSeen = null;
-const recCall = path => fetch(path, { method: "POST", headers: { "Content-Type": "application/json", "X-Meditation": "1" },
-  body: "{}" }).then(r => r.json());
+// ---------- Statuszeile: gespeichert, vertont, veröffentlicht ----------
+// Variante A des Inhabers (Oktober 2026): eine Zeile oben sagt alles. Der Admin-Helfer vertont nach dem Speichern von
+// selbst, was fehlt (neuer oder geänderter Text, andere Stimme, anderes Tempo, „Neu sprechen“), kurz nach der letzten
+// Änderung; Pause, Reihenfolge, An/Aus und Klänge brauchen keine Vertonung. Solange etwas läuft, fragt die Seite nach
+// dem Fortschritt (feiner Balken mit Prozent und Restzeit, Wunsch des Inhabers); danach lädt sie die Liste der Aufnahmen
+// neu. „Veröffentlichen (n)“ zählt, was noch nicht online ist. Veröffentlicht wird nur vollständig Vertontes (Inhaber):
+// Läuft noch eine Vertonung, wartet der Auftrag im Helfer und geht danach von selbst online.
+let recState = { laeuft: false, geplant: false, fertig: 0, gesamt: 0, aktuell: "", fehler: "", stand: 0, rest: null,
+  stimme: "", fehlend: 0, offen: null, veroeffentlichen: { zustand: "" } };
+let recTimer = null, recSeen = null, pubSeen = null;
+const recCall = (path, body = {}) => fetch(path, { method: "POST",
+  headers: { "Content-Type": "application/json", "X-Meditation": "1" }, body: JSON.stringify(body) }).then(r => r.json());
 async function reloadRecordings() {
   try {
     const js = await fetch(`js/aufnahmen.js?t=${Date.now()}`, { cache: "no-store" }).then(r => r.text());
@@ -171,35 +178,37 @@ async function reloadRecordings() {
     if (m) self.RECORDINGS = JSON.parse(m[1]);
   } catch {}
 }
-const missingRecordings = () => PHASES.flatMap(p => allSayings(p.id)).filter(s => !recordingOf(s.text)).length;
-function paintRecording() {
-  const box = document.getElementById("admRec"), text = document.getElementById("admRecText");
+const recBusy = () => recState.laeuft || recState.geplant;
+const pubBusy = () => ["wartet", "laeuft"].includes(recState.veroeffentlichen?.zustand);
+const nSayings = n => n === 1 ? "Ein Spruch" : `${n} Sprüche`;
+function paintStatus() {
+  const text = document.getElementById("admRecText"), btn = document.getElementById("admRecBtn");
   const bar = document.getElementById("admRecBar"), fill = document.getElementById("admRecFill");
-  const pct = document.getElementById("admRecPct"), btn = document.getElementById("admRecBtn");
-  const missing = missingRecordings();
-  box.hidden = !recState.laeuft && !recState.fehler && !missing;
-  box.classList.toggle("warn", !!recState.fehler && !recState.laeuft);
-  bar.hidden = pct.hidden = !recState.laeuft;
-  btn.hidden = recState.laeuft || !missing;
+  const n = recState.fehlend || 0, werden = n === 1 ? "wird" : "werden";
+  text.classList.toggle("warn", !!recState.fehler && !recBusy());
+  bar.hidden = !recState.laeuft;
+  btn.hidden = recBusy() || !n;
+  btn.textContent = recState.fehler ? "Nochmal versuchen" : "Jetzt vertonen";
+  text.title = "";
   if (recState.laeuft) {
-    // Feingliedrig (Inhaber): Prozent vom Helfer, je Satz zwei Teilschritte; der Balken gleitet zwischen den Abfragen
     const p = Math.max(0, Math.min(100, recState.prozent || 0));
     fill.style.width = `${p}%`;
     bar.setAttribute("aria-valuenow", p);
-    pct.textContent = `${p} %`;
-    const n = recState.gesamt, k = Math.min(recState.fertig + 1, n);
-    const satz = recState.aktuell ? ` „${recState.aktuell.slice(0, 40)}${recState.aktuell.length > 40 ? " …" : ""}“` : "";
-    // Mit Restzeit (Inhaber: nicht lange auf das Ende warten müssen, ohne zu wissen, wie lange)
     const rest = recState.rest ? ` · noch ${fmtWait(recState.rest)}` : "";
-    const wer = recState.stimme ? ` (${recState.stimme})` : "";
-    text.textContent = recState.schritt === "Satz wird gesprochen" && n
-      ? `Vertonung${wer}: Satz ${k} von ${n} wird gesprochen${satz}${rest}`
-      : recState.schritt === "Sätze werden umgewandelt" && n
-      ? `Vertonung${wer}: Sätze werden umgewandelt, ${Math.min(recState.fertig, n)} von ${n}${rest}`
-      : recState.schritt === "Fertig" ? "Vertonung fertig ✓"
-      : `Vertonung${wer}: ${(recState.schritt || "läuft").replace(/^Vertonung /, "")} …${rest}`;
-  } else if (recState.fehler) text.textContent = `Vertonung nicht möglich: ${recState.fehler}`;
-  else text.textContent = missing ? `${missing === 1 ? "Ein Spruch ist" : `${missing} Sprüche sind`} noch nicht vertont.` : "";
+    const was = ["Sätze werden umgewandelt", "Liste wird geschrieben"].includes(recState.schritt) ? "umgerechnet" : "vertont";
+    text.textContent = `${n ? `${nSayings(n)} ${werden} ${was}` : "Aufnahmen werden aktualisiert"} · ${p} %${rest}`;
+    // Genauer beim Darüberfahren: Stimme, Schritt, gerade gesprochener Satz
+    const k = Math.min(recState.fertig + 1, recState.gesamt);
+    text.title = [recState.stimme, recState.schritt === "Satz wird gesprochen" && recState.gesamt
+      ? `Satz ${k} von ${recState.gesamt}: „${recState.aktuell}“` : recState.schritt].filter(Boolean).join(" · ");
+  } else if (recState.geplant) text.textContent = `${nSayings(n)} ${werden} gleich vertont`;
+  else if (recState.fehler) text.textContent = `Vertonung abgebrochen: ${recState.fehler}`;
+  else text.textContent = n ? `${nSayings(n)} noch nicht vertont` : "✓ Alles vertont";
+  // Knopf: Zahl der offenen Änderungen; „✓ Alles online“, wenn es nichts gibt
+  const pub = document.getElementById("publishBtn"), z = recState.veroeffentlichen?.zustand, offen = recState.offen;
+  pub.classList.toggle("done", !pubBusy() && offen === 0);
+  pub.textContent = z === "wartet" ? "Wartet auf Vertonung …" : z === "laeuft" ? "Wird veröffentlicht …"
+    : offen === 0 ? "✓ Alles online" : `Veröffentlichen${offen ? ` (${offen})` : ""}`;
 }
 // Liste neu zeichnen, um „wird vertont …“ zu zeigen oder auszublenden: nur, wo es Sprüche gibt, und nie beim
 // Bearbeiten, Umbenennen oder auf „Einstellungen“ (sonst nähme es dort den Regler aus der Hand)
@@ -208,26 +217,34 @@ function redrawForRecording() {
   if (admEditing || admRenaming || !PHASES.some(p => p.id === admTab)) renderAdminTabs();
   else renderAdmin();
 }
-async function watchRecording() {
+async function refreshStatus() {
   clearTimeout(recTimer);
-  const wasRunning = recState.laeuft;
-  try { recState = await recCall("api/aufnahme-status"); } catch { return; }
-  if (recState.laeuft && !wasRunning) redrawForRecording();   // Sprüche ohne Aufnahme zeigen „wird vertont …“
-  if (recSeen !== null && recState.stand !== recSeen) {       // ein Durchgang ist fertig: neue Aufnahmen holen
+  const wasBusy = recBusy();
+  try { recState = await recCall("api/status"); } catch { return; }
+  if (recBusy() !== wasBusy) redrawForRecording();   // „wird vertont …“ an den Sprüchen
+  if (recSeen !== null && recState.stand !== recSeen) {   // ein Durchgang ist fertig: neue Aufnahmen holen
     await reloadRecordings();
-    if (adminDlg.open && !recState.fehler && recState.gesamt) showToast("✓ Vertonung fertig. Die neuen Sprüche sind aufgenommen.");
+    if (adminDlg.open && !recState.fehler && !recState.fehlend) showToast("✓ Vertonung fertig. Alle Sprüche sind aufgenommen.");
     redrawForRecording();
     render();
     updateVoiceNote();
-  } else if (wasRunning && !recState.laeuft) redrawForRecording();   // „wird vertont …“ wieder ausblenden
+  }
   recSeen = recState.stand;
-  paintRecording();
-  if (recState.laeuft && adminDlg.open) recTimer = setTimeout(watchRecording, 500);
+  // Veröffentlichen, das in dieser Sitzung angestoßen wurde: Ergebnis melden
+  const pub = recState.veroeffentlichen || {};
+  if (["wartet", "laeuft"].includes(pubSeen) && pub.zustand === "fertig") {
+    showToast(pub.aenderungen?.length ? `✓ Veröffentlicht (Stand ${pub.stand}). Online in 1 bis 10 Minuten; auf dem iPhone ` +
+      "erscheint dann „Neue Version verfügbar“." : "Alles war schon veröffentlicht.", null, { long: true });
+  }
+  if (["wartet", "laeuft"].includes(pubSeen) && pub.zustand === "fehler") showAlert(pub.meldung);
+  pubSeen = pub.zustand;
+  paintStatus();
+  if (adminDlg.open && (recBusy() || pubBusy())) recTimer = setTimeout(refreshStatus, recState.laeuft ? 500 : 1000);
 }
 document.getElementById("admRecBtn").addEventListener("click", async () => {
   try { recState = await recCall("api/vertonen"); } catch { return; }
-  paintRecording();
-  setTimeout(watchRecording, 500);
+  paintStatus();
+  setTimeout(refreshStatus, 500);
 });
 
 // ---------- Gruppe abspielen ----------
@@ -301,13 +318,14 @@ function sayingRow(s, no, pid, group) {
           <label class="adm-phase-pick">Gruppe <select data-act="group"><option value="">ohne Gruppe</option>${groups.map(g =>
             `<option value="${g.id}"${g === group ? " selected" : ""}>${esc(g.name)}</option>`).join("")}</select></label>
           <button class="btn sm primary" data-act="save">Speichern</button>
-          <button class="btn sm" data-act="cancel">Abbrechen</button></div></div></li>`;
+          <button class="btn sm" data-act="cancel">Abbrechen</button>
+          ${voiceVaries() && recordingOf(s.text) ? `<button class="btn sm" data-act="retake" title="Die Stimme spricht diesen Spruch noch einmal, etwas anders betont">↻ Neu sprechen</button>` : ""}</div></div></li>`;
   }
   return `<li class="adm-row${s.active ? "" : " off"}" data-id="${s.id}">
     <button class="adm-drag" data-act="drag" aria-label="Verschieben: ${esc(s.text.slice(0, 40))} (Pfeiltasten hoch und runter)" title="Ziehen zum Verschieben">⠿</button>
     <span class="adm-no" aria-hidden="true">${no}</span>
     <span class="adm-text">${esc(s.text)}<span class="adm-dur">${fmtDur(sayingSeconds(s.text))}${recordingOf(s.text) ? ""
-      : `<span class="adm-norec">${recState.laeuft ? "wird vertont …" : "noch nicht vertont"}</span>`}</span></span>
+      : `<span class="adm-norec">${recBusy() ? "wird vertont …" : "noch nicht vertont"}</span>`}</span></span>
     <span class="adm-actions">
       <button class="adm-icon" data-act="listen" aria-label="Anhören" title="Anhören">▶</button>
       <label class="switch" title="${s.active ? "Aktiv: wird vorgelesen" : "Deaktiviert: wird nicht vorgelesen"}">
@@ -397,12 +415,14 @@ const fmtWait = sec => {
 };
 let voiceCatalog = null, voiceProg = null, probeAudio = null;
 const currentVoice = () => settings.stimme || VOICE_DEFAULT;
+// Klingt das gewählte Programm bei jedem Sprechen etwas anders (Chatterbox)? Dann gibt es „Neu sprechen“.
+const voiceVaries = () => !!voiceCatalog?.programme?.find(p => p.id === currentVoice().programm)?.variiert;
 async function loadVoices() {
   try {
     const r = await recCall("api/stimmen");
     voiceCatalog = r.ok ? r : { fehler: r.fehler };
   } catch { voiceCatalog = { fehler: "Der Admin-Helfer antwortet nicht." }; }
-  if (admTab === "einst" && adminDlg.open) renderAdmin();
+  if (adminDlg.open && (admTab === "einst" || admEditing)) renderAdmin();
 }
 function stopProbe() {
   if (probeAudio) { probeAudio.pause(); probeAudio = null; }
@@ -415,7 +435,7 @@ function playProbe(src, btn) {
   if (again || !src) return;
   probeAudio = new Audio(src);
   probeAudio.preservesPitch = true;
-  probeAudio.playbackRate = currentVoice().tempo;
+  probeAudio.playbackRate = tempoDraft ?? currentVoice().tempo;
   probeAudio.onended = stopProbe;
   probeAudio.play().catch(stopProbe);
   if (btn) { btn.classList.add("playing"); btn.textContent = "■"; }
@@ -451,16 +471,18 @@ function voiceMarkup() {
       So lange liest die bisherige Stimme weiter. Zurück zu einer schon benutzten Stimme geht schnell.</p>`;
 }
 function settingsMarkup() {
-  const tempo = Math.round(currentVoice().tempo * 100);
+  const tempo = Math.round((tempoDraft ?? currentVoice().tempo) * 100);
   return `<h3 class="adm-set-title">Stimme</h3>
     ${voiceMarkup()}
     <h3 class="adm-set-title">Sprechtempo</h3>
-    <p class="adm-hint">Wie schnell die Stimme spricht; 100 % wie aufgenommen. Die Tonhöhe bleibt gleich. Die Aufnahmen werden
-      danach in etwa einer Minute umgerechnet, neu sprechen ist nicht nötig.</p>
+    <p class="adm-hint">Wie schnell die Stimme spricht; 100 % wie aufgenommen, die Tonhöhe bleibt gleich. Beim Schieben hörst du
+      die Probe gleich im neuen Tempo. „Übernehmen“ rechnet danach alle Aufnahmen um (etwa 1 bis 2 Minuten, neu sprechen ist
+      nicht nötig); bis dahin bleibt das bisherige Tempo.</p>
     <div class="adm-set-row">
       <input type="range" id="setTempo" min="${TEMPO_MIN * 100}" max="${TEMPO_MAX * 100}" step="5" value="${tempo}" aria-label="Sprechtempo in Prozent">
       <output class="adm-set-out" id="setTempoOut">${tempo} %</output>
       <button class="btn sm" id="setTempoTry">▶ Probe hören</button>
+      <button class="btn sm primary" id="setTempoApply"${tempoDraft === null ? " hidden" : ""}>Übernehmen</button>
     </div>
     <h3 class="adm-set-title">Pause zwischen den Sätzen</h3>
     <p class="adm-hint">So lange ist es still, bevor der nächste Satz beginnt: zwischen zwei Sprüchen und ebenso zwischen den
@@ -471,7 +493,10 @@ function settingsMarkup() {
         inputmode="decimal" aria-label="Pause in Sekunden"><span>s</span></label>
       <button class="btn sm" id="setPauseTry">▶ Probe hören</button>
     </div>
-    <p class="adm-hint">Standard: ${fmtSec(PAUSE_DEFAULT)}. Bereich ${fmtSec(PAUSE_MIN)} bis ${fmtSec(PAUSE_MAX)}.</p>`;
+    <p class="adm-hint">Standard: ${fmtSec(PAUSE_DEFAULT)}. Bereich ${fmtSec(PAUSE_MIN)} bis ${fmtSec(PAUSE_MAX)}.</p>
+    <h3 class="adm-set-title">Frühere Stände</h3>
+    <p class="adm-hint">Bei jedem Speichern wird der bisherige Stand gesichert. Hier lässt sich ein früherer zurückholen.</p>
+    <button class="btn sm" id="backupBtn">Frühere Stände ansehen</button>`;
 }
 const voiceName = v => {
   const p = voiceCatalog?.programme.find(p => p.id === v.programm);
@@ -486,17 +511,24 @@ function pickVoice(programm, stimme) {
     settings.stimme = cleanVoice({ ...currentVoice(), programm, stimme });
   }, { long: true });
 }
-let tempoSaveTimer;
+// Tempo: Der Regler ändert erst nur die Probe (sofort, im Browser); „Übernehmen“ speichert, dann rechnet der Helfer alle
+// Aufnahmen um. So entstehen nicht bei jedem Schieben neue Dateien (die beim Veröffentlichen alle neu hochgehen).
+let tempoDraft = null;   // geschoben, aber noch nicht übernommen
 function setTempo(v) {
-  const t = cleanVoice({ ...VOICE_DEFAULT, ...currentVoice(), tempo: Number(v) / 100 });
-  const tempo = (t || VOICE_DEFAULT).tempo;
+  const tempo = (cleanVoice({ ...VOICE_DEFAULT, ...currentVoice(), tempo: Number(v) / 100 }) || VOICE_DEFAULT).tempo;
   document.getElementById("setTempoOut").textContent = `${Math.round(tempo * 100)} %`;
   if (probeAudio) probeAudio.playbackRate = tempo;
-  if (tempo === currentVoice().tempo) return;
-  settings.stimme = t;
-  // Wie bei der Pause: erst kurz nach dem Loslassen speichern, dann rechnet der Helfer die Aufnahmen um
-  clearTimeout(tempoSaveTimer);
-  tempoSaveTimer = setTimeout(() => { keepDraft(); scheduleSave(); }, 800);
+  tempoDraft = tempo === currentVoice().tempo ? null : tempo;
+  document.getElementById("setTempoApply").hidden = tempoDraft === null;
+}
+function applyTempo() {
+  if (tempoDraft === null) return;
+  const tempo = tempoDraft;
+  tempoDraft = null;
+  withUndo(`Sprechtempo ${Math.round(tempo * 100)} % übernommen. Die Aufnahmen werden jetzt umgerechnet ` +
+    "(etwa 1 bis 2 Minuten); bis dahin spricht das bisherige Tempo.", () => {
+    settings.stimme = cleanVoice({ ...currentVoice(), tempo });
+  }, { long: true });
 }
 let pauseSaveTimer;
 function setPause(v, final) {
@@ -506,11 +538,12 @@ function setPause(v, final) {
   if (clean === settings.pause) return;
   settings.pause = clean;
   // Nur speichern, nicht neu zeichnen: sonst nähme das Neuzeichnen den Regler mitten im Ziehen aus der Hand.
-  // Beim Ziehen nicht bei jedem Zehntel speichern, sondern kurz nach dem letzten.
+  // Beim Ziehen nicht bei jedem Zehntel speichern, sondern kurz nach dem letzten (gemerkt ist es sofort).
   renderAdminTabs();   // Dauern in den Reitern und „Ohne Wiederholung“ gleich mit
   render();
+  keepDraft();
   clearTimeout(pauseSaveTimer);
-  pauseSaveTimer = setTimeout(() => { keepDraft(); scheduleSave(); }, 500);
+  pauseSaveTimer = setTimeout(scheduleSave, 500);
 }
 admPanel.addEventListener("input", e => {
   if (e.target.id === "setPause") { setPause(e.target.value); document.getElementById("setPauseNum").value = settings.pause; }
@@ -523,6 +556,8 @@ admPanel.addEventListener("click", e => {
   const act = e.target.closest("[data-act]");
   if (act?.dataset.act === "voice-prog") { stopProbe(); voiceProg = act.dataset.prog; renderAdmin(); }
   if (act?.dataset.act === "voice-pick") pickVoice(act.dataset.prog, act.dataset.voice);
+  if (e.target.closest("#setTempoApply")) applyTempo();
+  if (e.target.closest("#backupBtn")) openBackups();
   if (e.target.closest("#setTempoTry")) {
     const cur = currentVoice();
     const v = voiceCatalog?.programme.find(p => p.id === cur.programm)?.stimmen.find(s => s.id === cur.stimme);
@@ -549,8 +584,14 @@ adminBtn.addEventListener("click", async () => {
   adminDlg.querySelector('[aria-selected="true"]')?.focus();
   admStatus.textContent = "";
   offerDraft();
-  if (await checkHelper()) watchRecording();
-  else {
+  if (await checkHelper()) {
+    admStatus.textContent = "✓ Gespeichert";
+    admStatus.className = "adm-status ok";
+    recCall("api/abgleich", { defaults: DEFAULT_SAYINGS }).catch(() => {});   // Stand von GitHub, für die Zahl am Knopf
+    if (!voiceCatalog) { voiceCatalog = false; loadVoices(); }                // für „Neu sprechen“
+    refreshStatus();
+    setTimeout(refreshStatus, 4000);   // nachdem der Stand von GitHub da ist
+  } else {
     admStatus.textContent = location.protocol === "file:"
       ? "Als Datei geöffnet: Änderungen werden nicht gespeichert. Bitte über http://localhost:8766/ öffnen."
       : "Admin-Helfer läuft nicht: Änderungen gelten nur bis zum Neuladen.";
@@ -575,6 +616,7 @@ document.getElementById("admTabs").addEventListener("click", e => {
   if (!t) return;
   admTab = t.dataset.tab;
   admEditing = admRenaming = null;
+  tempoDraft = null;
   renderAdmin();
   document.querySelector(`[data-tab="${admTab}"]`)?.focus();
 });
@@ -618,6 +660,7 @@ admPanel.addEventListener("click", e => {
   else if (act === "edit") { admEditing = f.item.id; admRenaming = null; renderAdmin(); }
   else if (act === "cancel") { admEditing = null; renderAdmin(); }
   else if (act === "save") saveEdit(row);
+  else if (act === "retake") retake(f.item.text);
   else if (act === "delete") withUndo(`Gelöscht: ${short(f.item.text)}`, () => f.list.splice(f.index, 1), { danger: true });
 });
 
@@ -864,68 +907,91 @@ admPanel.addEventListener("pointerdown", e => {
 const publishDlg = document.getElementById("publishDlg");
 const pubBody = document.getElementById("pubBody");
 const pubYes = document.getElementById("pubYes"), pubNo = document.getElementById("pubNo");
-const draft = () => ({ sayings, sounds: soundsOn, settings, defaults: DEFAULT_SAYINGS });
-async function helperCall(path) {
-  const r = await fetch(path, {
-    method: "POST", headers: { "Content-Type": "application/json", "X-Meditation": "1" }, body: JSON.stringify(draft()),
-  });
-  return r.json();
-}
 const changeList = list => `<ul class="pub-list">${list.map(z => `<li>${esc(z)}</li>`).join("")}</ul>`;
-document.getElementById("publishBtn").addEventListener("click", async () => {
+// Erst alles speichern, was noch in der Warteschlange steht: veröffentlicht wird der gespeicherte Stand
+async function flushSave() {
+  if (!unsaved) return true;
+  clearTimeout(saveTimer);
+  clearTimeout(pauseSaveTimer);
+  await saveNow();
+  return !unsaved;
+}
+function pubMessage(html, close = "Schließen") {
+  pubBody.innerHTML = html;
   pubYes.hidden = true;
-  pubNo.textContent = "Abbrechen";
-  document.getElementById("pubSteps").hidden = true;
-  pubBody.innerHTML = `<p>Ich vergleiche mit der veröffentlichten Fassung …</p>`;
+  pubNo.textContent = close;
+}
+document.getElementById("publishBtn").addEventListener("click", async () => {
+  if (recState.veroeffentlichen?.zustand === "laeuft") { showToast("Wird gerade veröffentlicht …"); return; }
   publishDlg.showModal();
+  if (recState.veroeffentlichen?.zustand === "wartet") {   // Auftrag wartet auf die Vertonung: abbrechen?
+    pubMessage(`<p>Wird veröffentlicht, sobald die Vertonung fertig ist${recState.rest ? ` (noch ${fmtWait(recState.rest)})` : ""}.
+      Du kannst den Admin-Bereich schließen; der Helfer erledigt es auch dann.</p>`, "Weiter warten");
+    pubYes.textContent = "Nicht veröffentlichen";
+    pubYes.dataset.mode = "cancel";
+    pubYes.hidden = false;
+    return;
+  }
+  pubMessage("<p>Ich vergleiche mit der veröffentlichten Fassung …</p>", "Abbrechen");
   if (!(await checkHelper())) {
-    pubBody.innerHTML = `<p class="pub-warn">Der Admin-Helfer läuft nicht. Er startet beim Anmelden von selbst; bitte über
-      <b>http://localhost:8766/</b> öffnen.</p>`;
-    pubNo.textContent = "Schließen";
+    pubMessage(`<p class="pub-warn">Der Admin-Helfer läuft nicht. Er startet beim Anmelden von selbst; bitte über
+      <b>http://localhost:8766/</b> öffnen.</p>`);
+    return;
+  }
+  if (!(await flushSave())) {
+    pubMessage(`<p class="pub-warn">Die letzte Änderung ist noch nicht gespeichert (siehe roter Hinweis). Veröffentlicht wird nur
+      der gespeicherte Stand.</p>`);
     return;
   }
   try {
-    const r = await helperCall("api/vorschau");
-    if (!r.ok) { pubBody.innerHTML = `<p class="pub-warn">${esc(r.fehler)}</p>`; pubNo.textContent = "Schließen"; return; }
-    if (!r.aenderungen.length) {
-      pubBody.innerHTML = `<p>Alles ist schon veröffentlicht, es gibt nichts Neues.</p>`;
-      pubNo.textContent = "Schließen";
-      return;
-    }
-    pubBody.innerHTML = `<p>Diese Änderungen gehen an alle (online, GitHub Pages zeigt sie nach 1 bis 10 Minuten):</p>${changeList(r.aenderungen)}`;
+    const r = await recCall("api/vorschau", { defaults: DEFAULT_SAYINGS });
+    if (!r.ok) { pubMessage(`<p class="pub-warn">${esc(r.fehler)}</p>`); return; }
+    if (!r.aenderungen.length) { pubMessage("<p>Alles ist schon veröffentlicht, es gibt nichts Neues.</p>"); return; }
+    const wait = r.fehlend > 0 || r.vertonung;
+    pubBody.innerHTML = `<p>Diese Änderungen gehen an alle (online; GitHub Pages zeigt sie nach 1 bis 10 Minuten):</p>
+      ${changeList(r.aenderungen)}${wait ? `<p class="pub-note">${r.fehlend ? `${nSayings(r.fehlend)} ${r.fehlend === 1 ? "ist" : "sind"}
+      noch nicht vertont.` : "Die Vertonung läuft noch."} Veröffentlicht wird erst, wenn alles vertont ist, dann von selbst. Kommen bis
+      dahin weitere Änderungen dazu, gehen sie mit.</p>` : ""}`;
+    pubYes.textContent = wait ? "Veröffentlichen, sobald vertont" : "Ja, für alle veröffentlichen";
+    pubYes.dataset.mode = "go";
     pubYes.hidden = false;
     pubYes.focus();
   } catch {
-    pubBody.innerHTML = `<p class="pub-warn">Der Admin-Helfer antwortet nicht.</p>`;
-    pubNo.textContent = "Schließen";
+    pubMessage(`<p class="pub-warn">Der Admin-Helfer antwortet nicht.</p>`);
   }
 });
 pubYes.addEventListener("click", async () => {
-  publishDlg.busy = true;
   pubYes.hidden = true;
-  pubNo.disabled = true;
-  const steps = document.getElementById("pubSteps");
-  steps.hidden = false;
-  steps.querySelectorAll("li").forEach(li => li.className = "");
-  steps.querySelector("li").className = "busy";
   try {
-    const r = await helperCall("api/veroeffentlichen");
-    if (!r.ok) throw new Error(r.fehler);
-    steps.querySelectorAll("li").forEach(li => li.className = r.schritte.includes(li.dataset.step) ? "done" : "");
-    pubBody.innerHTML = r.aenderungen.length
-      ? `<p class="pub-ok">Veröffentlicht (Stand ${esc(r.stand)}). Auf dem iPhone erscheint „Neue Version verfügbar“.</p>${changeList(r.aenderungen)}`
-      : `<p>Alles ist schon veröffentlicht, es gibt nichts Neues.</p>`;
+    if (pubYes.dataset.mode === "cancel") {
+      await recCall("api/veroeffentlichen-abbrechen");
+      publishDlg.close();
+      showToast("Nicht veröffentlicht. Gespeichert ist alles; du kannst es später veröffentlichen.");
+    } else {
+      const r = await recCall("api/veroeffentlichen", { defaults: DEFAULT_SAYINGS });
+      if (!r.ok) throw new Error(r.fehler);
+      publishDlg.close();
+      pubSeen = "wartet";   // das Ergebnis meldet die Statuszeile
+    }
+    refreshStatus();
   } catch (e) {
-    steps.querySelectorAll("li").forEach(li => li.className = li.className === "busy" ? "fail" : li.className);
-    pubBody.innerHTML = `<p class="pub-warn">${esc(e.message || "Der Admin-Helfer antwortet nicht.")}</p>`;
+    pubMessage(`<p class="pub-warn">${esc(e.message || "Der Admin-Helfer antwortet nicht.")}</p>`);
   }
-  publishDlg.busy = false;
-  pubNo.disabled = false;
-  pubNo.textContent = "Schließen";
-  pubNo.focus();
 });
 pubNo.addEventListener("click", () => publishDlg.close());
-publishDlg.addEventListener("cancel", e => { if (publishDlg.busy) e.preventDefault(); });
+
+// „Neu sprechen“ (beim Bearbeiten, nur Chatterbox): Die Stimme spricht den Spruch noch einmal, etwas anders betont. Bis
+// die neue Aufnahme fertig ist, gilt die bisherige.
+async function retake(text) {
+  admEditing = null;
+  renderAdmin();
+  try {
+    const r = await recCall("api/neu-sprechen", { text });
+    if (!r.ok) throw new Error(r.fehler);
+    showToast("Wird neu gesprochen (etwa eine Minute je Satz). Danach mit ▶ anhören; gefällt es nicht, noch einmal.", null, { long: true });
+    refreshStatus();
+  } catch (e) { showToast(`Neu sprechen ging nicht: ${e.message || "Helfer antwortet nicht"}`, null, { danger: true }); }
+}
 
 // ---------- Liegengebliebener Entwurf ----------
 // Liegt im Browser ein Stand, der nie gespeichert wurde (Helfer lief nicht, Seite geschlossen …), und weicht er vom
@@ -973,7 +1039,7 @@ async function reloadConfig() {
   render();
   renderAdmin();
 }
-document.getElementById("backupBtn").addEventListener("click", async () => {
+async function openBackups() {
   const list = document.getElementById("bkList");
   list.innerHTML = "<li>Lädt …</li>";
   backupDlg.showModal();
@@ -984,7 +1050,7 @@ document.getElementById("backupBtn").addEventListener("click", async () => {
         <button class="btn sm" data-file="${esc(b.datei)}">Wiederherstellen</button></li>`).join("")
       : "<li>Noch keine Sicherungen. Sie entstehen ab jetzt bei jedem Speichern.</li>";
   } catch { list.innerHTML = '<li class="pub-warn">Der Admin-Helfer antwortet nicht.</li>'; }
-});
+}
 document.getElementById("bkList").addEventListener("click", async e => {
   const b = e.target.closest("[data-file]");
   if (!b) return;
@@ -997,7 +1063,7 @@ document.getElementById("bkList").addEventListener("click", async e => {
     await reloadConfig();
     backupDlg.close();
     showToast("Früheren Stand wiederhergestellt. Der Stand davor ist ebenfalls gesichert.");
-    watchRecording();
+    refreshStatus();
   } catch (err) { b.disabled = false; showToast(`Wiederherstellen ging nicht: ${err.message || "Helfer antwortet nicht"}`, null, { danger: true }); }
 });
 document.getElementById("bkClose").addEventListener("click", () => backupDlg.close());

@@ -28,8 +28,12 @@ Reines HTML/CSS/JS wie im Retro-Cockpit. Klassische Skripte in `js/`, Reihenfolg
   Phase und Gruppe wählen (Inhaber); Gruppen als Karten (anlegen, umbenennen, auf-/zuklappen, aktiv, auflösen, ziehen);
   **Löschen (Inhaber):** Gruppe nur nach roter Rückfrage (`#confirmDlg`, „Abbrechen“ vorausgewählt; nur auflösen oder mit
   allen Sprüchen löschen); nach jedem Löschen rote Meldung mit deutlichem „Rückgängig“ (`showToast(…, { danger })`, 10 s); Sprechdauer je Phase und je Spruch (Inhaber, geschätzt bis zu den Aufnahmen); Klänge
-  deaktivieren; „Für alle veröffentlichen“. Speichert sofort über den Helfer. Gesamtdauer aller aktiven Sprüche unter den
-  Reitern (Inhaber). Ladebalken der Vertonung, „noch nicht vertont“/„wird vertont …“ je Spruch, „Jetzt vertonen“.
+  deaktivieren; „Veröffentlichen“. Speichert sofort über den Helfer. Gesamtdauer aller aktiven Sprüche unter den
+  Reitern (Inhaber). „noch nicht vertont“/„wird vertont …“ je Spruch, „Neu sprechen“ beim Bearbeiten (nur Chatterbox,
+  `variiert` in stimmen.json). **Statuszeile (Variante A des Inhabers, 7. Oktober 2026):** eine Zeile oben: „✓ Gespeichert“,
+  Vertonung mit Prozent und Restzeit (feiner Balken am Rand), Knopf „Veröffentlichen (n)“ mit der Zahl der offenen
+  Änderungen bzw. „✓ Alles online“. Sprechtempo: Regler ändert nur die Hörprobe, erst „Übernehmen“ rechnet um.
+  „Frühere Stände“ unter „Einstellungen“.
   **Schutz vor Überschreiben:** Speichern schickt den Fingerabdruck (`configStand`, SHA-256 von config.js) mit; hat sich
   config.js inzwischen geändert, lehnt der Helfer ab („KONFLIKT“), die Seite zeigt rot „Seite neu laden“. Claude ändert
   Sprüche nur über `/api/speichern` mit aktuellem Fingerabdruck (Sicherung und Vertonung inklusive), nie direkt in der Datei.
@@ -45,10 +49,15 @@ Reines HTML/CSS/JS wie im Retro-Cockpit. Klassische Skripte in `js/`, Reihenfolg
   `git push origin HEAD:main`. Ohne GitHub-Verbindung (noch kein `origin`) sagt er das verständlich.
   **Sicherungen:** vor jedem Speichern legt er den bisherigen Stand von config.js mit Uhrzeit in
   `~/.local/share/meditation-app/sicherungen/` ab (500 Stück); im Admin-Bereich „Frühere Stände“ zum Wiederherstellen.
-  **Automatische Vertonung (Inhaber):** nach jedem Speichern im Hintergrund `aufnahmen.py` (gewählte Stimme, nur fehlende
-  Sätze, Sperre gegen zwei gleichzeitige Läufe); `/api/aufnahme-status` für den Ladebalken mit Restzeit; wechseln Stimme oder
+  **Automatische Vertonung (Inhaber):** nur wenn nach dem Speichern eine Aufnahme fehlt (`aufnahmen.vertont()`: neuer oder
+  geänderter Text, Stimme, Tempo, „Neu sprechen“; nicht bei Pause, Reihenfolge, An/Aus, Klängen), 5 s nach der letzten
+  Änderung im Hintergrund `aufnahmen.py` (liest die Texte direkt aus config.js und vor jedem Satz neu, aktive Sprüche
+  zuerst, Rohaufnahmen werden nie gelöscht, Sperre gegen zwei gleichzeitige Läufe); `/api/status` für die Statuszeile;
+  **veröffentlicht wird nur der gespeicherte und vollständig vertonte Stand (Inhaber, 7. Oktober 2026):** läuft noch eine
+  Vertonung, wartet der Auftrag und geht danach von selbst online. Wechseln Stimme oder
   Tempo während einer Vertonung, bricht er sie ab (Prozessgruppe) und beginnt neu; `/api/stimmen` für die Stimmenwahl; „Für alle veröffentlichen“ nimmt
-  `stimme/`, `js/aufnahmen.js` und die Liste in `sw.js` mit. Optionen `--port`, `--kopie`, `--sicherungen` für Tests.
+  `stimme/`, `js/aufnahmen.js` und die Liste in `sw.js` mit. Optionen `--ordner`, `--port`, `--kopie`, `--sicherungen` und Umgebung `MEDITATION_ROH` (eigener Zwischenspeicher) für
+  Tests; Testkopie mit einem Ersatz-GitHub (`git clone --bare` als origin), dann wird nichts wirklich veröffentlicht.
   **Vorsicht:** Der Helfer des Retro-Cockpits heißt genauso (`admin_helfer.py`); Prozesse nur über ihren Ordner
   (`/proc/<pid>/cwd`) unterscheiden, nie per `pkill -f admin_helfer`. Schutz wie im Retro-Cockpit: Host/Origin
   localhost, Kopf `X-Meditation: 1`, JSON. `http://127.0.0.2:8766/` zeigt die App wie veröffentlicht (ohne Admin).

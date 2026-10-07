@@ -17,7 +17,7 @@
 <link rel="preload" href="fonts/AtkinsonHyperlegible-Bold.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/InterZiffern-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/InterZiffern-Bold.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="app.css?v=35955563">
+<link rel="stylesheet" href="app.css?v=c59fb162">
 </head>
 <body>
 <div class="wrap">
@@ -119,12 +119,18 @@
 <!-- Admin-Bereich (nur lokal): links die Phasen und Klänge als Reiter, rechts deren Einträge -->
 <dialog class="admin" id="adminDlg" aria-labelledby="admTitle">
   <div class="adm-card">
+    <!-- Kopfleiste mit einer Statuszeile (Variante A des Inhabers, Oktober 2026): gespeichert, vertont, veröffentlicht -->
     <div class="adm-head">
       <h2 id="admTitle">Sprüche und Klänge</h2>
-      <span class="adm-status" id="admStatus" role="status"></span>
-      <button class="btn sm" id="backupBtn">Frühere Stände</button>
-      <button class="btn sm primary" id="publishBtn">Für alle veröffentlichen</button>
+      <div class="adm-state" role="status" aria-live="polite">
+        <span class="adm-status" id="admStatus"></span>
+        <span class="adm-rec-text" id="admRecText"></span>
+        <button class="link" id="admRecBtn" hidden>Jetzt vertonen</button>
+      </div>
+      <button class="btn sm primary" id="publishBtn">Veröffentlichen</button>
       <button class="btn sm" id="admClose">Fertig</button>
+      <span class="adm-rec-bar" id="admRecBar" role="progressbar" aria-label="Fortschritt der Vertonung" aria-valuemin="0"
+        aria-valuemax="100" aria-valuenow="0" hidden><span class="adm-rec-fill" id="admRecFill"></span></span>
     </div>
     <!-- Roter Hinweis, wenn nicht gespeichert werden konnte bzw. ein ungespeicherter Stand im Browser liegt -->
     <div class="adm-alert" id="admAlert" hidden role="alert">
@@ -133,14 +139,6 @@
       <button class="btn sm" id="admAlertDrop" hidden>Verwerfen</button>
       <button class="btn sm" id="admAlertReload" hidden>Seite neu laden</button>
     </div>
-    <!-- Vertonung (Inhaber): Ladebalken, solange der Helfer neue oder geänderte Sprüche aufnimmt -->
-    <div class="adm-rec" id="admRec" hidden role="status" aria-live="polite">
-      <span class="adm-rec-text" id="admRecText"></span>
-      <span class="adm-rec-bar" id="admRecBar" role="progressbar" aria-label="Fortschritt der Vertonung" aria-valuemin="0"
-        aria-valuemax="100" aria-valuenow="0"><span class="adm-rec-fill" id="admRecFill"></span></span>
-      <b class="adm-rec-pct" id="admRecPct"></b>
-      <button class="btn sm" id="admRecBtn" hidden>Jetzt vertonen</button>
-    </div>
     <div class="adm-body">
       <div class="adm-tabs" id="admTabs" role="tablist" aria-label="Phasen und Klänge"></div>
       <section class="adm-panel" id="admPanel" role="tabpanel"></section>
@@ -148,15 +146,10 @@
   </div>
 </dialog>
 
-<!-- Für alle veröffentlichen: erst die Änderungen zeigen, nach „Ja“ drei Schritte mit Haken -->
+<!-- Veröffentlichen: erst die Änderungen zeigen; nach „Ja“ übernimmt der Helfer, die Statuszeile zeigt den Fortschritt -->
 <dialog class="publish" id="publishDlg" aria-labelledby="pubTitle">
   <h2 id="pubTitle">Für alle veröffentlichen</h2>
   <div id="pubBody"></div>
-  <ol class="pub-steps" id="pubSteps" hidden>
-    <li data-step="geprueft">Geprüft</li>
-    <li data-step="gespeichert">Gespeichert (lokal)</li>
-    <li data-step="hochgeladen">Hochgeladen zu GitHub (online)</li>
-  </ol>
   <div class="pub-btns">
     <button class="btn primary" id="pubYes" hidden>Ja, für alle veröffentlichen</button>
     <button class="btn" id="pubNo">Abbrechen</button>
@@ -202,7 +195,7 @@
 <script src="js/plan.js?v=727a6b85"></script>
 <script src="js/sitzung.js?v=e2313898"></script>
 <script src="js/bedienung.js?v=7a5092f0"></script>
-<script src="js/admin.js?v=474e86cc"></script>
+<script src="js/admin.js?v=fec27097"></script>
 <script src="js/start.js?v=bf25bd92"></script>
 </body>
 </html>
