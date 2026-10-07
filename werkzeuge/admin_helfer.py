@@ -17,7 +17,10 @@ admin-helfer.log daneben).
   Stimme (neuer oder geänderter Text, andere Stimme, anderes Tempo, „Neu sprechen“), nimmt der Helfer sie im
   Hintergrund auf (werkzeuge/aufnahmen.py; Programm, Stimme und Tempo wählt der Inhaber unter „Einstellungen“, die
   Auswahl steht in werkzeuge/stimmen.json). Er wartet dafür kurz (WARTEN), damit mehrere Änderungen hintereinander ein
-  einziger Durchgang werden. Pause, Reihenfolge, An/Aus, Gruppen und Klänge brauchen keine Vertonung. Wechselt die
+  einziger Durchgang werden. Pause, Reihenfolge, An/Aus, Gruppen und Klänge brauchen keine Vertonung.
+  „Vertonung abbrechen“ (Inhaber, Oktober 2026, /api/vertonung-anhalten): beendet den laufenden Durchgang, nichts
+  Neues beginnt mehr (auch nicht nach dem Speichern oder einem Neustart), bis „Fortsetzen“ (/api/vertonen). Schon
+  gesprochene Sätze bleiben im Zwischenspeicher. /api/herkunft: je Spruch, mit welcher Stimme er aufgenommen ist. Wechselt die
   Stimme oder das Tempo während einer Vertonung, bricht der Helfer sie ab und beginnt mit der neuen (schon Gesprochenes
   bleibt im Zwischenspeicher). POST /api/stimmen liefert die Auswahl mit Hörproben, /api/neu-sprechen eine neue
   Variante eines Spruchs.
@@ -287,6 +290,15 @@ def gewaehlte_stimme(root):
     return {**STIMME_STANDARD, **((daten.get("settings") or {}).get("stimme") or {})}
 
 
+def angehalten_datei():
+    """Merkt sich „Vertonung abgebrochen“ über einen Neustart hinweg (neben den Sicherungen, für Tests eigener Ordner)."""
+    return SICHERUNGEN.parent / "vertonung-angehalten"
+
+
+def angehalten():
+    return angehalten_datei().exists()
+
+
 def fehlende(root):
     """Sprüche, denen eine Aufnahme der gewählten Stimme fehlt (leer = vollständig vertont)."""
     try:
@@ -296,9 +308,14 @@ def fehlende(root):
         return ["?"]
 
 
-def vertonen_anstossen(root, sofort=False):
+def vertonen_anstossen(root, sofort=False, fortsetzen=False):
     """Nach dem Speichern: Vertonung nur, wenn etwas fehlt. Nicht sofort, sondern WARTEN Sekunden nach der letzten
-    Änderung (sofort: „Neu sprechen“, „Nochmal versuchen“, Veröffentlichen wartet)."""
+    Änderung (sofort: „Neu sprechen“, „Nochmal versuchen“, Veröffentlichen wartet). Angehalten: nichts, außer bei
+    „Fortsetzen“ (fortsetzen=True)."""
+    if fortsetzen:
+        angehalten_datei().unlink(missing_ok=True)
+    elif angehalten():
+        return
     with VERTONUNG_SPERRE:
         if VERTONUNG["laeuft"]:
             VERTONUNG["nochmal"] = True
@@ -324,6 +341,53 @@ def vertonen_anstossen(root, sofort=False):
         uhr.daemon = True
         VERTONUNG_UHR[0] = uhr
         uhr.start()
+
+
+def vertonung_anhalten(root):
+    """„Vertonung abbrechen“: laufenden Durchgang beenden, geplanten verwerfen, nichts Neues bis „Fortsetzen“. Ein
+    Veröffentlichen, das auf die Vertonung wartet, wird ebenfalls abgebrochen (es würde nie fertig)."""
+    angehalten_datei().parent.mkdir(parents=True, exist_ok=True)
+    angehalten_datei().touch()
+    with VERTONUNG_SPERRE:
+        if VERTONUNG_UHR[0]:
+            VERTONUNG_UHR[0].cancel()
+            VERTONUNG_UHR[0] = None
+        VERTONUNG.update(geplant=False, nochmal=False, fehler="")
+        prozess = VERTONUNG["prozess"]
+        if VERTONUNG["laeuft"] and prozess:
+            VERTONUNG["abgebrochen"] = True
+            try:
+                os.killpg(prozess.pid, 15)
+            except OSError:
+                pass
+    if AUFTRAG["zustand"] == "wartet":
+        AUFTRAG.update(zustand="fehler", nummer=AUFTRAG["nummer"] + 1,
+                       meldung="Nicht veröffentlicht: Die Vertonung wurde abgebrochen.")
+    return status(root)
+
+
+HERKUNFT_ZWISCHEN = {"schluessel": None, "daten": {}}
+
+
+def herkunft_liste(root):
+    """Je Spruch die Stimme der gültigen Aufnahme, in Worten (für die Zeile unter dem Spruch)."""
+    root = Path(root)
+    liste = root / "js/aufnahmen.js"
+    schluessel = (liste.stat().st_mtime_ns if liste.exists() else 0,
+                  max((f.stat().st_mtime_ns for f in aufnahmen.ROH.glob("*/neu.json")), default=0))
+    if schluessel != HERKUNFT_ZWISCHEN["schluessel"]:
+        katalog = stimmen_katalog()
+        daten = {}
+        for text, h in aufnahmen.herkunft(root).items():
+            if h.get("gemischt"):
+                daten[text] = {"wer": "verschiedene Aufnahmen"}
+                continue
+            p = katalog.get(h["programm"], {})
+            name = re.sub(r"\s*\(.*\)$", "", p.get("stimmen", {}).get(h["stimme"], {}).get("name", h["stimme"]))
+            tempo = f" · {round(h['tempo'] * 100)} %" if h["tempo"] != 1 else ""
+            daten[text] = {"wer": f"{p.get('name', h['programm'])} · {name}{tempo}", "zeit": h["zeit"]}
+        HERKUNFT_ZWISCHEN.update(schluessel=schluessel, daten=daten)
+    return {"ok": True, "herkunft": HERKUNFT_ZWISCHEN["daten"]}
 
 
 def vertonung_starten(root):
@@ -423,7 +487,7 @@ def status(root):
     """Alles für die Statuszeile: Vertonung, fehlende Aufnahmen, nicht veröffentlichte Änderungen, Veröffentlichen."""
     return {"ok": True, **{k: VERTONUNG[k] for k in ("laeuft", "geplant", "fertig", "gesamt", "aktuell", "fehler",
                                                       "stand", "prozent", "schritt", "rest", "stimme")},
-            "fehlend": len(fehlende(root)), "offen": offen_zaehlen(root),
+            "fehlend": len(fehlende(root)), "offen": offen_zaehlen(root), "angehalten": angehalten(),
             "veroeffentlichen": {k: AUFTRAG[k] for k in ("zustand", "meldung", "stand", "aenderungen")}}
 
 
@@ -797,7 +861,10 @@ class Helfer(http.server.SimpleHTTPRequestHandler):
                     "/api/sicherungen": lambda e: sicherungen_liste(),
                     "/api/wiederherstellen": lambda e: (wiederherstellen(e, self.root / "config.js"),
                                                         vertonen_anstossen(self.root))[0],
-                    "/api/vertonen": lambda e: (vertonen_anstossen(self.root, sofort=True), status(self.root))[1],
+                    "/api/vertonen": lambda e: (vertonen_anstossen(self.root, sofort=True, fortsetzen=True),
+                                                status(self.root))[1],
+                    "/api/vertonung-anhalten": lambda e: vertonung_anhalten(self.root),
+                    "/api/herkunft": lambda e: herkunft_liste(self.root),
                     "/api/vorschau": lambda e: vorschau(e, self.root, self.kopie),
                     "/api/veroeffentlichen": lambda e: veroeffentlichen(e, self.root, self.kopie)}
         if pfad not in aktionen:

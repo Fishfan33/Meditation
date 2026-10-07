@@ -167,7 +167,17 @@ function withUndo(msg, action, opts) {
 // neu. „Veröffentlichen (n)“ zählt, was noch nicht online ist. Veröffentlicht wird nur vollständig Vertontes (Inhaber):
 // Läuft noch eine Vertonung, wartet der Auftrag im Helfer und geht danach von selbst online.
 let recState = { laeuft: false, geplant: false, fertig: 0, gesamt: 0, aktuell: "", fehler: "", stand: 0, rest: null,
-  stimme: "", fehlend: 0, offen: null, veroeffentlichen: { zustand: "" } };
+  stimme: "", fehlend: 0, offen: null, angehalten: false, veroeffentlichen: { zustand: "" } };
+// Je Spruch: mit welcher Stimme die gültige Aufnahme entstand (Inhaber, Oktober 2026), vom Helfer aus den Dateinamen
+let recOrigin = {};
+async function loadOrigins() {
+  try { const r = await recCall("api/herkunft"); if (r.ok) recOrigin = r.herkunft; } catch {}
+}
+const fmtWhen = sec => new Date(sec * 1000).toLocaleString("de-DE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const originText = text => {
+  const o = recordingOf(text) && recOrigin[text];
+  return o ? ` · ${o.wer}${o.zeit ? `, ${fmtWhen(o.zeit)}` : ""}` : "";
+};
 let recTimer = null, recSeen = null, pubSeen = null;
 const recCall = (path, body = {}) => fetch(path, { method: "POST",
   headers: { "Content-Type": "application/json", "X-Meditation": "1" }, body: JSON.stringify(body) }).then(r => r.json());
@@ -188,7 +198,8 @@ function paintStatus() {
   text.classList.toggle("warn", !!recState.fehler && !recBusy());
   bar.hidden = !recState.laeuft;
   btn.hidden = recBusy() || !n;
-  btn.textContent = recState.fehler ? "Nochmal versuchen" : "Jetzt vertonen";
+  btn.textContent = recState.angehalten ? "Fortsetzen" : recState.fehler ? "Nochmal versuchen" : "Jetzt vertonen";
+  document.getElementById("admRecStop").hidden = !recBusy();
   text.title = "";
   if (recState.laeuft) {
     const p = Math.max(0, Math.min(100, recState.prozent || 0));
@@ -202,6 +213,7 @@ function paintStatus() {
     text.title = [recState.stimme, recState.schritt === "Satz wird gesprochen" && recState.gesamt
       ? `Satz ${k} von ${recState.gesamt}: „${recState.aktuell}“` : recState.schritt].filter(Boolean).join(" · ");
   } else if (recState.geplant) text.textContent = `${nSayings(n)} ${werden} gleich vertont`;
+  else if (recState.angehalten) text.textContent = n ? `Vertonung abgebrochen · ${nSayings(n)} noch nicht vertont` : "✓ Alles vertont";
   else if (recState.fehler) text.textContent = `Vertonung abgebrochen: ${recState.fehler}`;
   else text.textContent = n ? `${nSayings(n)} noch nicht vertont` : "✓ Alles vertont";
   // Knopf: Zahl der offenen Änderungen; „✓ Alles online“, wenn es nichts gibt
@@ -224,6 +236,7 @@ async function refreshStatus() {
   if (recBusy() !== wasBusy) redrawForRecording();   // „wird vertont …“ an den Sprüchen
   if (recSeen !== null && recState.stand !== recSeen) {   // ein Durchgang ist fertig: neue Aufnahmen holen
     await reloadRecordings();
+    await loadOrigins();
     if (adminDlg.open && !recState.fehler && !recState.fehlend) showToast("✓ Vertonung fertig. Alle Sprüche sind aufgenommen.");
     redrawForRecording();
     render();
@@ -241,6 +254,18 @@ async function refreshStatus() {
   paintStatus();
   if (adminDlg.open && (recBusy() || pubBusy())) recTimer = setTimeout(refreshStatus, recState.laeuft ? 500 : 1000);
 }
+// „Vertonung abbrechen“ (Inhaber): Laufendes endet, nichts Neues beginnt, bis „Fortsetzen“. Gesprochene Sätze bleiben.
+document.getElementById("admRecStop").addEventListener("click", async () => {
+  try { recState = await recCall("api/vertonung-anhalten"); } catch { return; }
+  paintStatus();
+  redrawForRecording();
+  showToast("Vertonung abgebrochen. Fertige Sätze bleiben gespeichert; mit „Fortsetzen“ geht es dort weiter.", async () => {
+    try { recState = await recCall("api/vertonen"); } catch { return; }
+    paintStatus();
+    setTimeout(refreshStatus, 500);
+  }, { long: true });
+  setTimeout(refreshStatus, 800);
+});
 document.getElementById("admRecBtn").addEventListener("click", async () => {
   try { recState = await recCall("api/vertonen"); } catch { return; }
   paintStatus();
@@ -324,7 +349,7 @@ function sayingRow(s, no, pid, group) {
   return `<li class="adm-row${s.active ? "" : " off"}" data-id="${s.id}">
     <button class="adm-drag" data-act="drag" aria-label="Verschieben: ${esc(s.text.slice(0, 40))} (Pfeiltasten hoch und runter)" title="Ziehen zum Verschieben">⠿</button>
     <span class="adm-no" aria-hidden="true">${no}</span>
-    <span class="adm-text">${esc(s.text)}<span class="adm-dur">${fmtDur(sayingSeconds(s.text))}${recordingOf(s.text) ? ""
+    <span class="adm-text">${esc(s.text)}<span class="adm-dur">${fmtDur(sayingSeconds(s.text))}${esc(originText(s.text))}${recordingOf(s.text) ? ""
       : `<span class="adm-norec">${recBusy() ? "wird vertont …" : "noch nicht vertont"}</span>`}</span></span>
     <span class="adm-actions">
       <button class="adm-icon" data-act="listen" aria-label="Anhören" title="Anhören">▶</button>
@@ -589,6 +614,7 @@ adminBtn.addEventListener("click", async () => {
     admStatus.className = "adm-status ok";
     recCall("api/abgleich", { defaults: DEFAULT_SAYINGS }).catch(() => {});   // Stand von GitHub, für die Zahl am Knopf
     if (!voiceCatalog) { voiceCatalog = false; loadVoices(); }                // für „Neu sprechen“
+    loadOrigins().then(() => { if (adminDlg.open && !admEditing && !admRenaming) redrawForRecording(); });
     refreshStatus();
     setTimeout(refreshStatus, 4000);   // nachdem der Stand von GitHub da ist
   } else {
@@ -988,7 +1014,8 @@ async function retake(text) {
   try {
     const r = await recCall("api/neu-sprechen", { text });
     if (!r.ok) throw new Error(r.fehler);
-    showToast("Wird neu gesprochen (etwa eine Minute je Satz). Danach mit ▶ anhören; gefällt es nicht, noch einmal.", null, { long: true });
+    showToast(r.angehalten ? "Vorgemerkt. Die Vertonung ist abgebrochen; mit „Fortsetzen“ oben wird er neu gesprochen."
+      : "Wird neu gesprochen (etwa eine Minute je Satz). Danach mit ▶ anhören; gefällt es nicht, noch einmal.", null, { long: true });
     refreshStatus();
   } catch (e) { showToast(`Neu sprechen ging nicht: ${e.message || "Helfer antwortet nicht"}`, null, { danger: true }); }
 }

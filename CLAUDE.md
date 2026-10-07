@@ -33,6 +33,10 @@ Reines HTML/CSS/JS wie im Retro-Cockpit. Klassische Skripte in `js/`, Reihenfolg
   `variiert` in stimmen.json). **Statuszeile (Variante A des Inhabers, 7. Oktober 2026):** eine Zeile oben: „✓ Gespeichert“,
   Vertonung mit Prozent und Restzeit (feiner Balken am Rand), Knopf „Veröffentlichen (n)“ mit der Zahl der offenen
   Änderungen bzw. „✓ Alles online“. Sprechtempo: Regler ändert nur die Hörprobe, erst „Übernehmen“ rechnet um.
+  **„Vertonung abbrechen“ (Inhaber, 7. Oktober 2026):** Knopf in der Statuszeile, solange vertont wird; danach startet
+  nichts Neues (auch nicht nach Speichern oder Neustart, gemerkt in `~/.local/share/meditation-app/vertonung-angehalten`),
+  bis „Fortsetzen“. **Je Spruch die Stimme der gültigen Aufnahme** (Inhaber): „· Piper · Thorsten, 7. Okt., 14:32“ unter
+  dem Text, aus den Dateinamen erkannt (`aufnahmen.herkunft()`, `/api/herkunft`).
   „Frühere Stände“ unter „Einstellungen“.
   **Schutz vor Überschreiben:** Speichern schickt den Fingerabdruck (`configStand`, SHA-256 von config.js) mit; hat sich
   config.js inzwischen geändert, lehnt der Helfer ab („KONFLIKT“), die Seite zeigt rot „Seite neu laden“. Claude ändert
@@ -175,6 +179,10 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
   Piper Thorsten bei 100 % behält die alten Dateinamen (keine neuen Aufnahmen nötig).
 - Wahl im Admin-Bereich unter „Einstellungen“ (Variante A): Programm-Umschalter, Stimmen mit Hörprobe und „Wählen“ (mit Rückgängig), Sprechtempo 80–120 %, Pause.
   `config.js` `settings.stimme = {programm, stimme, tempo}` (fehlt = Standard), geprüft in `cleanVoice` und im Helfer.
+- **Vorlage tauschen:** Der Zwischenspeicher erkennt eine Stimme an ihrem Eintrag in `stimmen.json` (Dateiname der
+  Vorlage), nicht am Inhalt der WAV-Datei. Eine neue Vorlage deshalb immer unter neuem Namen und als neuen Eintrag
+  anlegen (z. B. `karlsson-echt`), nie `karlsson.wav` überschreiben, sonst gelten alte Rohaufnahmen weiter.
+  Echte Karlsson-Ausschnitte (M-AILABS, LibriVox) zum Anhören: `hoerproben/karlsson-vorlagen/` (Inhaber wählt).
 - **Chatterbox auf diesem Rechner (gemessen 7. Oktober 2026):** Laden ~2 Min., 50–80 s je Satz (4 Rechenkerne, Standard),
   **~5 GB Arbeitsspeicher** bei 7,5 GB im Rechner. Läuft die Claude-App gleichzeitig, beendet der Speicher-Notfallschutz
   Prozesse (so zweimal am 7. Oktober 2026). Lange Vertonungen deshalb ohne Claude-App und ohne Browser laufen lassen.

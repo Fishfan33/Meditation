@@ -46,6 +46,7 @@ OUT = ROOT / "stimme"
 # Für Tests ein eigener Zwischenspeicher (MEDITATION_ROH), damit sie den echten nicht füllen
 ROH = Path(os.environ.get("MEDITATION_ROH") or Path.home() / ".local/share/meditation-app/rohaufnahmen")
 PHASEN = ["einstimmung", "bodyscan", "kraftort", "unterbewusst", "rueckkehr"]   # wie PHASES in js/phasen.js
+TEMPO_MIN, TEMPO_MAX = 0.8, 1.2   # wie in js/zustand.js
 PROTOKOLL = Path.home() / ".local/share/meditation-app/sprecher.log"
 STANDARD = {"programm": "piper", "stimme": "thorsten", "tempo": 1.0}
 # Bisherige Dateinamen der ersten Stimme (Piper Thorsten A2), damit vorhandene Aufnahmen gültig bleiben
@@ -163,6 +164,38 @@ def vertont(root=None):
         if ist != soll or not all((root / d).is_file() for d in soll):
             fehlend.append(t)
     return {"fehlend": fehlend, "gesamt": len(eintraege)}
+
+
+def herkunft(root=None):
+    """Für den Admin-Bereich: Mit welcher Stimme ist jeder Spruch aufgenommen, der in der gültigen Liste steht
+    (js/aufnahmen.js, also erfolgreich vertont und gespeichert)? Aus dem Dateinamen erkannt: Er hängt an Programm,
+    Stimme, Tempo und Variante, also wird für jede bekannte Stimme und jedes Tempo nachgerechnet. Liefert je Text
+    {programm, stimme, tempo, zeit} (zeit: Unix-Sekunden der jüngsten Datei) oder {gemischt: True}."""
+    root = Path(root or ROOT)
+    liste = aufnahmen_lesen(root)
+    saetze_alle = {z for t in liste for z in saetze(t)}
+    namen = {}
+    for programm, eintrag in katalog().items():
+        for name in eintrag["stimmen"]:
+            for k in range(int(round(TEMPO_MIN * 20)), int(round(TEMPO_MAX * 20)) + 1):
+                st = Stimme({"programm": programm, "stimme": name, "tempo": k / 20}, root)
+                for z in saetze_alle:
+                    v_jetzt = st.variante(z)
+                    for v in range(v_jetzt + 1):
+                        st.varianten[satz_kennung(z)] = v
+                        namen.setdefault(f"stimme/{st.mp3(z).name}", (programm, name, k / 20))
+                    st.varianten[satz_kennung(z)] = v_jetzt
+    ergebnis = {}
+    for t, teile in liste.items():
+        wer = {namen.get(d) for d, _ in teile}
+        dateien = [root / d for d, _ in teile if (root / d).is_file()]
+        if len(wer) != 1 or None in wer or len(dateien) != len(teile):
+            ergebnis[t] = {"gemischt": True}
+            continue
+        programm, name, tempo = wer.pop()
+        ergebnis[t] = {"programm": programm, "stimme": name, "tempo": tempo,
+                       "zeit": int(max(f.stat().st_mtime for f in dateien))}
+    return ergebnis
 
 
 class Stimme:
