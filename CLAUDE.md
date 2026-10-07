@@ -153,6 +153,11 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
 - **Audit (Inhaber, Oktober 2026):** Wenn der Aufbau fertig ist und vor den Texten ein umfassendes Audit der
   Meditations-App über alle Bereiche aus `~/.claude/CLAUDE.md` („Audits“), mit Bericht; danach das Retro-Cockpit.
 - Automatische Tests (`werkzeuge/tests.py` nach Vorlage des Retro-Cockpits) fehlen noch.
+- **Für später vorgemerkt (Inhaber, 8. Oktober 2026): automatische Prüfung der Vertonung.** Jetzt gilt: der Inhaber hört
+  an und lässt schiefe Sätze mit „Neu sprechen“ neu sprechen. Möglich wäre (a) Whisper als Sicherheitsnetz nach der
+  Vertonung (findet verschluckte oder doppelte Wörter, Gemurmel; nicht den Klang) und (b) eine automatische
+  Klangbewertung (Natürlichkeit, z. B. blecherne Laute; meist auf Englisch trainiert). Beides nur nacheinander mit
+  Chatterbox (Speicher), Downloads vorher prüfen.
 - **Security-Audit (Oktober 2026), vor dem ersten Hochladen:** behoben: Helfer liefert nur der eigenen Seite aus (Host
   geprüft, keine versteckten Ordner wie `.git`, keine Ordnerlisten), Datenschutzseite auf die Aufnahmen angepasst, keine
   persönlichen Angaben in Projektdateien („der Inhaber“); erstes Hochladen als neue Geschichte (siehe oben).
