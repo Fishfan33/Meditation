@@ -1,4 +1,4 @@
-// Meditation – Stimme und Gong.
+// Meditation – Stimme und Ton.
 // Teil der App in js/: klassische Skripte, die sich einen gemeinsamen Gültigkeitsbereich teilen und in der
 // Reihenfolge aus index.html geladen werden (Phasen zuerst, Start zuletzt). Übersicht: CLAUDE.md, „Aufbau“.
 
@@ -46,7 +46,7 @@ function loadRecording(text) {
   if (!parts || !audioCtx) return Promise.resolve(null);
   return Promise.all(parts.map(([file]) => loadFile(file))).then(bufs => bufs.every(Boolean) ? bufs : null);
 }
-// Vorab laden, z. B. alle Sätze einer Meditation, während der Gong klingt
+// Vorab laden, z. B. alle Sätze einer Meditation gleich beim Starten
 // Nacheinander statt alle auf einmal: das iPhone verkraftet viele gleichzeitige Entpackungen nicht
 function preloadRecordings(texts) {
   texts.reduce((kette, t) => kette.then(() => loadRecording(t)), Promise.resolve());
@@ -126,35 +126,6 @@ function audioUnlock() {
   audioCtx?.resume?.().catch(() => {});
   // Die Sprachausgabe einmal im Tipp anstoßen, sonst bleibt sie auf dem iPhone stumm
   if (synth && !audioUnlock.done) { synth.speak(new SpeechSynthesisUtterance(" ")); audioUnlock.done = true; }
-}
-
-// Gong zu Beginn: tiefe Klangschale „1b“ (Wahl des Inhabers, Oktober 2026), 110 Hz, etwa 4 Sekunden. Mehrere Teiltöne,
-// die unterschiedlich lang ausklingen, leicht gegeneinander verstimmt (das sanfte Schweben). Selbst erzeugt,
-// keine Tondatei nötig; Vorlage zum Anhören: werkzeuge/gong.py.
-const GONG_SECONDS = 4;
-function gong(strength = 1) {
-  if (!audioCtx) return;
-  const t = audioCtx.currentTime + .03;
-  const out = audioCtx.createGain();
-  out.gain.setValueAtTime(.3 * strength, t);
-  out.gain.setValueAtTime(.3 * strength, t + GONG_SECONDS - .8);
-  out.gain.linearRampToValueAtTime(.0001, t + GONG_SECONDS);   // sanft auf 4 Sekunden ausblenden
-  out.connect(audioCtx.destination);
-  const base = 110;
-  // [Verhältnis zum Grundton, Lautstärke, Zeitkonstante des Ausklingens in Sekunden]
-  [[1, 1, 1.9], [2.71, .45, 1.2], [5.15, .18, .7], [8.3, .06, .4]].forEach(([r, a, d]) => {
-    for (const detune of [-.45, .45]) {
-      const osc = audioCtx.createOscillator();
-      osc.frequency.value = base * r + detune;
-      const g = audioCtx.createGain();
-      g.gain.setValueAtTime(.0001, t);
-      g.gain.exponentialRampToValueAtTime(a / 2, t + .012);
-      g.gain.setTargetAtTime(.0001, t + .012, d);
-      osc.connect(g).connect(out);
-      osc.start(t);
-      osc.stop(t + GONG_SECONDS + .1);
-    }
-  });
 }
 
 // ---------- Hintergrundklang ----------

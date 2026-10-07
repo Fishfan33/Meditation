@@ -553,18 +553,18 @@ window.MEDITATION_CONFIG = {
       "id": "alpen20",
       "text": "Dieser verborgene Ort gehört mir. Ich kenne ihn, ich finde ihn, und ich kann jederzeit hierher zurückkehren.",
       "active": true
+     },
+     {
+      "id": "kra-mux714r8lj",
+      "text": "Ein Vogel fliegt lautlos in großer Höhe. Er gleitet zeitlos durch die Luft.",
+      "active": true
+     },
+     {
+      "id": "kra-mux72zgj6",
+      "text": "Ich bin zu Hause, in den Bergen, die Millionen von Jahren alt sind. Und weitere Millionen Jahre werden sie hier stehen.",
+      "active": true
      }
     ]
-   },
-   {
-    "id": "kra-mux714r8lj",
-    "text": "Ein Vogel fliegt lautlos in großer Höhe. Er gleitet zeitlos durch die Luft.",
-    "active": true
-   },
-   {
-    "id": "kra-mux72zgj6",
-    "text": "Ich bin zu Hause, in den Bergen, die Millionen von Jahren alt sind. Und weitere Millionen Jahre werden sie hier stehen.",
-    "active": true
    }
   ],
   "unterbewusst": [

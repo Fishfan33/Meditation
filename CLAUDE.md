@@ -1,7 +1,7 @@
 # Meditations-App
 
 Web-App, die durch eine Meditation führt: Phasen an- oder abwählen, je Phase einen Text (Affirmationen bzw.
-Sprüche) würfeln oder wählen, Gesamtdauer verteilen, dann „Starten“: Gong, Stimme liest vor, Stille, Gong.
+Sprüche) würfeln oder wählen, Gesamtdauer verteilen, dann „Starten“: Stimme liest vor, Stille.
 Arbeitstitel „Meditation“, Name und Gestaltung sind noch offen (der Inhaber wählt aus Varianten).
 
 ## Aufbau
@@ -14,12 +14,12 @@ Reines HTML/CSS/JS wie im Retro-Cockpit. Klassische Skripte in `js/`, Reihenfolg
   geschrieben von `werkzeuge/admin_helfer.py`; `null` = Grundbestand. Nicht von Hand bearbeiten.
 - `zustand.js` – `sayings`/`soundsOn` (aus config.js, geprüft mit `cleanSayings`/`cleanSounds`), `state` (nur im
   Speicher), Zeitverteilung in ganzen Minuten (`distribute`, `shiftBoundary`)
-- `stimme.js` – Vorlesen: Aufnahmen (Thorsten) über Web Audio, ohne Aufnahme Browser-Stimme; Gong (Web Audio,
-  Klangschale), Hintergrundklang (`startAmbience`). Start-Aufruf `chooseVoice()` steht am Dateiende (sonst bricht das Laden ab)
+- `stimme.js` – Vorlesen: Aufnahmen (Thorsten) über Web Audio, ohne Aufnahme Browser-Stimme;
+  Hintergrundklang (`startAmbience`). Start-Aufruf `chooseVoice()` steht am Dateiende (sonst bricht das Laden ab)
 - `aufnahmen.js` – `self.RECORDINGS` (Satz → [Datei, Sekunden]), geschrieben von `werkzeuge/aufnahmen.py`
 - `meldungen.js` – `showToast(msg, undo)` mit „Rückgängig“
 - `plan.js` – `render()`: Skala, Phasen-Schalter, Zeitbalken, Klang-Auswahl
-- `sitzung.js` – laufende Meditation: `buildSession()` (Gong, je Phase die aktiven Sprüche in Reihenfolge, von vorn,
+- `sitzung.js` – laufende Meditation: `buildSession()` (je Phase die aktiven Sprüche in Reihenfolge, von vorn,
   solange Zeit ist), Abspielen nach der Uhr, Pause, nächste Phase, Beenden mit zwei Tipps, Wake Lock
 - `bedienung.js` – Klicks und Eingaben der Startseite
 - `admin.js` – **Admin-Bereich** (nur lokal, `IS_ADMIN`): Reiter je Phase und „Klänge“; Sprüche ansehen, anhören,
@@ -70,7 +70,7 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
 ## Entscheidungen
 
 - **Der Inhaber meditiert selbst**, hauptsächlich auf einem **iPhone** (Inhaber, Oktober 2026). Die App führt durch:
-  Gong, Stimme, Text groß auf dunklem Bildschirm. Jede Änderung auch in iPhone-Größe prüfen.
+  Stimme, Text groß auf dunklem Bildschirm. Jede Änderung auch in iPhone-Größe prüfen.
 - Phasen (Inhaber): 1 Einstimmung, 2 Bodyscan, 3 Kraftort, 4 Die Arbeit im Unterbewussten, 5 Rückkehr; alle an- und
   abwählbar. Zeiten: Gesamtdauer (10/20/30 oder eigene) wird verteilt, je Phase änderbar (wie im Retro-Cockpit).
 - Texte schreibt Claude als Vorschläge, der Inhaber streicht und ändert.
@@ -84,8 +84,8 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
   - Klang-Auswahl (Inhaber): Der gewählte Klang **läuft sofort**, schon auf der Startseite, und spielt beim Starten
     ohne Unterbrechung weiter. In der Auswahl ein **waagrechter Lautstärkeregler** (`state.volume`). Dieselbe Auswahl
     mit Regler auch oben in der Meditations-Ansicht. Am Ende der Meditation blendet der Klang aus.
-  - **Gong nur zu Beginn** der Meditation, nicht zwischen den Phasen. Klang: tiefe Klangschale, 4 Sekunden
-    (vorläufig Probe „1b“, 110 Hz; der Inhaber hat noch nicht endgültig gewählt; Proben: `werkzeuge/gong.py`).
+  - **Kein Gong** (Inhaber, 7. Oktober 2026: ersatzlos gestrichen, vorher eine Klangschale zu Beginn). Die Meditation
+    beginnt nach 2 Sekunden Ruhe mit dem ersten Satz.
   - Phasen bleiben immer in derselben Reihenfolge.
   - **Sätze nacheinander mit einstellbarer Sprechpause** (Inhaber, 6. Oktober 2026): zuerst 1,1 s, dann „etwas länger“,
     Standard jetzt 2,0 s, im Admin-Bereich unter „Einstellungen“ 0,5–10 s in Zehntelsekunden (`settings.pause` in
@@ -140,7 +140,7 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
   `js/aufnahmen.js` und die Liste in `sw.js`); danach `js/aufnahmen.js` in `index.html` vor `stimme.js` eintragen,
   `media-src` um `blob:` ergänzen und die App auf die Tonspur umbauen. Herkunft der Stimme dann in `stimme/QUELLE.md`.
 - iPhone mit gesperrtem Bildschirm: Safari hält dann Zeitgeber und Sprachausgabe an. Plan: Mit den Aufnahmen die
-  ganze Meditation als **eine durchgehende Tonspur** abspielen (Sätze, Stille, Gong zusammengesetzt, `<audio>`),
+  ganze Meditation als **eine durchgehende Tonspur** abspielen (Sätze und Stille zusammengesetzt, `<audio>`),
   die läuft auch gesperrt weiter und ignoriert den Stumm-Schalter. Bis dahin bleibt der Bildschirm an (Wake Lock).
   Auf dem iPhone des Inhabers testen (als Symbol auf dem Home-Bildschirm, dann bleibt auch die Offline-Kopie dauerhaft).
 - Gestaltung (Farben, Meditations-Ansicht, Symbol, Name) in Varianten vorlegen; Ton der Texte mit dem Inhaber abstimmen.
