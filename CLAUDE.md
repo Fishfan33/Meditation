@@ -147,8 +147,7 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
   length 1,2, noise 0,85, noise-w 1,1) – **„lebendiger“ ist laut Inhaber schlechter, Piper-Einstellungen bleiben (A2)**. Als Nächstes: XTTS-v2 mit Thorsten-Vorlage installieren (2–3 GB, eigener Ordner,
   vorher Sicherheitsprüfung wie bei Piper erklären) und Proben 3/4 erzeugen; Alternativen für Deutsch: Azure
   Killian/Conrad (Konto nötig), ElevenLabs (bezahlt). Der Inhaber entscheidet nach Gehör.
-- **Arbeitskopie `korrektur/pause-vorschau`** (Übernahme-Anfrage #1): enthält zusätzlich die Satz-Pausen und neue
-  Aufnahmen; lokal gespeichert, **Hochladen nur nach OK**.
+- Übernahme-Anfragen #1 und #2 sind gemergt (Satz-Pausen, iPhone: Restzeit sichtbar, Aufnahmen robust); online geprüft.
 - Danach: durchgehende Tonspur fürs gesperrte iPhone, iPhone-Test, automatische Tests, Audit (alle Bereiche).
 
 ## Erkenntnisse aus dem Retro-Cockpit
@@ -248,6 +247,12 @@ Admin-Modus), gilt hier nicht.
   und Zeitgeber.
 
 ### Git und Veröffentlichen
+
+- **Erst Code, dann Daten (Fehler 7. Oktober 2026):** „Für alle veröffentlichen“ im Admin-Bereich lädt Daten (config.js,
+  `stimme/`, `js/aufnahmen.js`) direkt auf main, unabhängig von offenen Übernahme-Anfragen. Ändert sich das **Format**
+  dieser Daten (z. B. Aufnahmen je Satz), muss der Code, der es liest, **vorher** auf main sein, sonst bricht die
+  veröffentlichte App (Folge damals: auf dem iPhone sprach die Browser-Stimme). Neue Formate deshalb immer rückwärts-
+  verträglich lesen und Format-Änderungen erst nach dem Mergen des Codes veröffentlichen.
 
 - GitHub Pages aus Branch `main`. Arbeit auf einer Arbeitskopie (Branch), dann Übernahme-Anfrage; der Inhaber mergt (Squash).
 - Commit-Identität in diesem Ordner: `Fishfan33` mit der GitHub-noreply-Adresse (lokal eingestellt).
