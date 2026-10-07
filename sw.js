@@ -6,7 +6,7 @@
 // Ändert sich irgendeine App-Datei, ändert sich damit diese Datei: Der Browser installiert sie neu,
 // und die App bietet „Neue Version verfügbar, neu laden“ an (übernommen wird erst nach dem Klick).
 // Braucht die App eine neue Datei (Bild, Seite, Skript, Aufnahme), sie hier in FILES ergänzen.
-const VERSION = "7cbfcc66";
+const VERSION = "5834134a";
 const CACHE = "meditation-" + VERSION;
 const FILES = [
   "./",

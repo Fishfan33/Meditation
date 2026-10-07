@@ -143,7 +143,9 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
   ganze Meditation als **eine durchgehende Tonspur** abspielen (Sätze und Stille zusammengesetzt, `<audio>`),
   die läuft auch gesperrt weiter und ignoriert den Stumm-Schalter. Bis dahin bleibt der Bildschirm an (Wake Lock).
   Auf dem iPhone des Inhabers testen (als Symbol auf dem Home-Bildschirm, dann bleibt auch die Offline-Kopie dauerhaft).
-- Gestaltung (Farben, Meditations-Ansicht, Symbol, Name) in Varianten vorlegen; Ton der Texte mit dem Inhaber abstimmen.
+- **App-Symbol: Variante C des Inhabers (7. Oktober 2026):** schlichter Nadelbaum im Profil aus drei weichen Ebenen
+  (Dunkelgrün #2f4a3a), dahinter blassgrüner Mond, Stamm und Boden in Erdtönen, Creme-Grund; `werkzeuge/symbole.py`.
+- Gestaltung (Farben, Meditations-Ansicht, Name) in Varianten vorlegen; Ton der Texte mit dem Inhaber abstimmen.
 - **Audit (Inhaber, Oktober 2026):** Wenn der Aufbau fertig ist und vor den Texten ein umfassendes Audit der
   Meditations-App über alle Bereiche aus `~/.claude/CLAUDE.md` („Audits“), mit Bericht; danach das Retro-Cockpit.
 - Automatische Tests (`werkzeuge/tests.py` nach Vorlage des Retro-Cockpits) fehlen noch.
@@ -170,6 +172,12 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
   Piper Thorsten bei 100 % behält die alten Dateinamen (keine neuen Aufnahmen nötig).
 - Wahl im Admin-Bereich unter „Einstellungen“ (Variante A): Programm-Umschalter, Stimmen mit Hörprobe und „Wählen“ (mit Rückgängig), Sprechtempo 80–120 %, Pause.
   `config.js` `settings.stimme = {programm, stimme, tempo}` (fehlt = Standard), geprüft in `cleanVoice` und im Helfer.
+- **Chatterbox auf diesem Rechner (gemessen 7. Oktober 2026):** Laden ~2 Min., 50–80 s je Satz (4 Rechenkerne, Standard),
+  **~5 GB Arbeitsspeicher** bei 7,5 GB im Rechner. Läuft die Claude-App gleichzeitig, beendet der Speicher-Notfallschutz
+  Prozesse (so zweimal am 7. Oktober 2026). Lange Vertonungen deshalb ohne Claude-App und ohne Browser laufen lassen.
+  Der Helfer verhindert während einer Vertonung den Ruhezustand (`systemd-inhibit`, sonst schläft der Rechner nach
+  15 Minuten ein) und setzt nach einem Neustart eine unfertige Vertonung von selbst fort. Startet Claude den Helfer neu,
+  dann als eigener Dienst (`systemd-run --user --unit=meditation-helfer …`), damit er nicht mit der Claude-App endet.
 - Wartezeiten: Pause sofort; Tempo etwa 1–2 Min. (umrechnen); neue Stimme einmal alle Sätze: Piper ~3 Min., Chatterbox ~60 s
   je Satz auf diesem Rechner; zurück zu einer benutzten Stimme schnell.
 - Entscheidungsvorlage mit allen Hörproben: `hoerproben/entscheidung/index.html` (lokal, von Git ausgenommen), auch als

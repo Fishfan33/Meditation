@@ -42,6 +42,7 @@ import http.server
 import json
 import os
 import re
+import shutil
 import socket
 import subprocess
 import sys
@@ -70,6 +71,7 @@ STIMMEN = Path(__file__).resolve().parent / "stimmen.json"
 STIMME_STANDARD = {"programm": "piper", "stimme": "thorsten", "tempo": 1.0}   # wie VOICE_DEFAULT in js/zustand.js
 HOERPROBEN = "hoerproben/entscheidung"
 WARTEN = 5   # Sekunden nach der letzten Änderung, bevor die Vertonung beginnt
+WACH_BLEIBEN = True   # während einer Vertonung keinen Ruhezustand (systemd-inhibit); für Tests abschaltbar
 
 
 def stimmen_katalog():
@@ -338,8 +340,14 @@ def vertonen(root):
     while True:
         try:
             VERTONUNG.update(wahl=gewaehlte_stimme(root), abgebrochen=False)
-            # Eigene Prozessgruppe: Beim Abbrechen endet auch das Sprachprogramm (werkzeuge/sprecher.py)
-            prozess = subprocess.Popen([sys.executable, str(Path(root) / "werkzeuge" / "aufnahmen.py")], cwd=root,
+            # Eigene Prozessgruppe: Beim Abbrechen endet auch das Sprachprogramm (werkzeuge/sprecher.py).
+            # Solange vertont wird, schläft der Rechner nicht ein (sonst nach 15 Minuten ohne Eingabe; eine Vertonung mit
+            # Chatterbox dauert Stunden). Nur für die Dauer des Laufs, an den Energieeinstellungen ändert sich nichts.
+            befehl = [sys.executable, str(Path(root) / "werkzeuge" / "aufnahmen.py")]
+            if WACH_BLEIBEN and shutil.which("systemd-inhibit"):
+                befehl = ["systemd-inhibit", "--what=sleep:idle", "--who=Meditation", "--why=Vertonung läuft",
+                          "--mode=block"] + befehl
+            prozess = subprocess.Popen(befehl, cwd=root,
                                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
                                        start_new_session=True)
             VERTONUNG["prozess"] = prozess
@@ -837,6 +845,8 @@ def starten(root, port, kopie=KOPIE, adressen=("127.0.0.1", "127.0.0.2", "::1"))
                 raise SystemExit(f"Port {port} auf {adresse} ist belegt ({e.strerror}). Läuft der Helfer schon?")
     for s in server:
         threading.Thread(target=s.serve_forever, daemon=True).start()
+    # Nach einem Neustart (Rechner, Anmeldung): Fehlt noch etwas, geht die Vertonung von selbst weiter, wo sie war
+    vertonen_anstossen(Path(root))
     return server
 
 
