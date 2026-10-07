@@ -1,7 +1,7 @@
 # Meditations-App
 
 Web-App, die durch eine Meditation führt: Phasen an- oder abwählen, je Phase einen Text (Affirmationen bzw.
-Sprüche) würfeln oder wählen, Gesamtdauer verteilen, dann „Starten“: Gong, Stimme liest vor, Stille, Gong.
+Sprüche) würfeln oder wählen, Gesamtdauer verteilen, dann „Starten“: Stimme liest vor, Stille.
 Arbeitstitel „Meditation“, Name und Gestaltung sind noch offen (der Inhaber wählt aus Varianten).
 
 ## Aufbau
@@ -14,12 +14,12 @@ Reines HTML/CSS/JS wie im Retro-Cockpit. Klassische Skripte in `js/`, Reihenfolg
   geschrieben von `werkzeuge/admin_helfer.py`; `null` = Grundbestand. Nicht von Hand bearbeiten.
 - `zustand.js` – `sayings`/`soundsOn` (aus config.js, geprüft mit `cleanSayings`/`cleanSounds`), `state` (nur im
   Speicher), Zeitverteilung in ganzen Minuten (`distribute`, `shiftBoundary`)
-- `stimme.js` – Vorlesen: Aufnahmen (Thorsten) über Web Audio, ohne Aufnahme Browser-Stimme; Gong (Web Audio,
-  Klangschale), Hintergrundklang (`startAmbience`). Start-Aufruf `chooseVoice()` steht am Dateiende (sonst bricht das Laden ab)
+- `stimme.js` – Vorlesen: Aufnahmen (Thorsten) über Web Audio, ohne Aufnahme Browser-Stimme;
+  Hintergrundklang (`startAmbience`). Start-Aufruf `chooseVoice()` steht am Dateiende (sonst bricht das Laden ab)
 - `aufnahmen.js` – `self.RECORDINGS` (Satz → [Datei, Sekunden]), geschrieben von `werkzeuge/aufnahmen.py`
 - `meldungen.js` – `showToast(msg, undo)` mit „Rückgängig“
 - `plan.js` – `render()`: Skala, Phasen-Schalter, Zeitbalken, Klang-Auswahl
-- `sitzung.js` – laufende Meditation: `buildSession()` (Gong, je Phase die aktiven Sprüche in Reihenfolge, von vorn,
+- `sitzung.js` – laufende Meditation: `buildSession()` (je Phase die aktiven Sprüche in Reihenfolge, von vorn,
   solange Zeit ist), Abspielen nach der Uhr, Pause, nächste Phase, Beenden mit zwei Tipps, Wake Lock
 - `bedienung.js` – Klicks und Eingaben der Startseite
 - `admin.js` – **Admin-Bereich** (nur lokal, `IS_ADMIN`): Reiter je Phase und „Klänge“; Sprüche ansehen, anhören,
@@ -28,8 +28,12 @@ Reines HTML/CSS/JS wie im Retro-Cockpit. Klassische Skripte in `js/`, Reihenfolg
   Phase und Gruppe wählen (Inhaber); Gruppen als Karten (anlegen, umbenennen, auf-/zuklappen, aktiv, auflösen, ziehen);
   **Löschen (Inhaber):** Gruppe nur nach roter Rückfrage (`#confirmDlg`, „Abbrechen“ vorausgewählt; nur auflösen oder mit
   allen Sprüchen löschen); nach jedem Löschen rote Meldung mit deutlichem „Rückgängig“ (`showToast(…, { danger })`, 10 s); Sprechdauer je Phase und je Spruch (Inhaber, geschätzt bis zu den Aufnahmen); Klänge
-  deaktivieren; „Für alle veröffentlichen“. Speichert sofort über den Helfer. Gesamtdauer aller aktiven Sprüche unter den
-  Reitern (Inhaber). Ladebalken der Vertonung, „noch nicht vertont“/„wird vertont …“ je Spruch, „Jetzt vertonen“.
+  deaktivieren; „Veröffentlichen“. Speichert sofort über den Helfer. Gesamtdauer aller aktiven Sprüche unter den
+  Reitern (Inhaber). „noch nicht vertont“/„wird vertont …“ je Spruch, „Neu sprechen“ beim Bearbeiten (nur Chatterbox,
+  `variiert` in stimmen.json). **Statuszeile (Variante A des Inhabers, 7. Oktober 2026):** eine Zeile oben: „✓ Gespeichert“,
+  Vertonung mit Prozent und Restzeit (feiner Balken am Rand), Knopf „Veröffentlichen (n)“ mit der Zahl der offenen
+  Änderungen bzw. „✓ Alles online“. Sprechtempo: Regler ändert nur die Hörprobe, erst „Übernehmen“ rechnet um.
+  „Frühere Stände“ unter „Einstellungen“.
   **Schutz vor Überschreiben:** Speichern schickt den Fingerabdruck (`configStand`, SHA-256 von config.js) mit; hat sich
   config.js inzwischen geändert, lehnt der Helfer ab („KONFLIKT“), die Seite zeigt rot „Seite neu laden“. Claude ändert
   Sprüche nur über `/api/speichern` mit aktuellem Fingerabdruck (Sicherung und Vertonung inklusive), nie direkt in der Datei.
@@ -45,9 +49,15 @@ Reines HTML/CSS/JS wie im Retro-Cockpit. Klassische Skripte in `js/`, Reihenfolg
   `git push origin HEAD:main`. Ohne GitHub-Verbindung (noch kein `origin`) sagt er das verständlich.
   **Sicherungen:** vor jedem Speichern legt er den bisherigen Stand von config.js mit Uhrzeit in
   `~/.local/share/meditation-app/sicherungen/` ab (500 Stück); im Admin-Bereich „Frühere Stände“ zum Wiederherstellen.
-  **Automatische Vertonung (Inhaber):** nach jedem Speichern im Hintergrund `aufnahmen.py` (Piper, nur fehlende Sätze, Sperre
-  gegen zwei gleichzeitige Läufe); `/api/aufnahme-status` für den Ladebalken; „Für alle veröffentlichen“ nimmt
-  `stimme/`, `js/aufnahmen.js` und die Liste in `sw.js` mit. Optionen `--port`, `--kopie`, `--sicherungen` für Tests.
+  **Automatische Vertonung (Inhaber):** nur wenn nach dem Speichern eine Aufnahme fehlt (`aufnahmen.vertont()`: neuer oder
+  geänderter Text, Stimme, Tempo, „Neu sprechen“; nicht bei Pause, Reihenfolge, An/Aus, Klängen), 5 s nach der letzten
+  Änderung im Hintergrund `aufnahmen.py` (liest die Texte direkt aus config.js und vor jedem Satz neu, aktive Sprüche
+  zuerst, Rohaufnahmen werden nie gelöscht, Sperre gegen zwei gleichzeitige Läufe); `/api/status` für die Statuszeile;
+  **veröffentlicht wird nur der gespeicherte und vollständig vertonte Stand (Inhaber, 7. Oktober 2026):** läuft noch eine
+  Vertonung, wartet der Auftrag und geht danach von selbst online. Wechseln Stimme oder
+  Tempo während einer Vertonung, bricht er sie ab (Prozessgruppe) und beginnt neu; `/api/stimmen` für die Stimmenwahl; „Für alle veröffentlichen“ nimmt
+  `stimme/`, `js/aufnahmen.js` und die Liste in `sw.js` mit. Optionen `--ordner`, `--port`, `--kopie`, `--sicherungen` und Umgebung `MEDITATION_ROH` (eigener Zwischenspeicher) für
+  Tests; Testkopie mit einem Ersatz-GitHub (`git clone --bare` als origin), dann wird nichts wirklich veröffentlicht.
   **Vorsicht:** Der Helfer des Retro-Cockpits heißt genauso (`admin_helfer.py`); Prozesse nur über ihren Ordner
   (`/proc/<pid>/cwd`) unterscheiden, nie per `pkill -f admin_helfer`. Schutz wie im Retro-Cockpit: Host/Origin
   localhost, Kopf `X-Meditation: 1`, JSON. `http://127.0.0.2:8766/` zeigt die App wie veröffentlicht (ohne Admin).
@@ -60,7 +70,7 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
 ## Entscheidungen
 
 - **Der Inhaber meditiert selbst**, hauptsächlich auf einem **iPhone** (Inhaber, Oktober 2026). Die App führt durch:
-  Gong, Stimme, Text groß auf dunklem Bildschirm. Jede Änderung auch in iPhone-Größe prüfen.
+  Stimme, Text groß auf dunklem Bildschirm. Jede Änderung auch in iPhone-Größe prüfen.
 - Phasen (Inhaber): 1 Einstimmung, 2 Bodyscan, 3 Kraftort, 4 Die Arbeit im Unterbewussten, 5 Rückkehr; alle an- und
   abwählbar. Zeiten: Gesamtdauer (10/20/30 oder eigene) wird verteilt, je Phase änderbar (wie im Retro-Cockpit).
 - Texte schreibt Claude als Vorschläge, der Inhaber streicht und ändert.
@@ -74,8 +84,8 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
   - Klang-Auswahl (Inhaber): Der gewählte Klang **läuft sofort**, schon auf der Startseite, und spielt beim Starten
     ohne Unterbrechung weiter. In der Auswahl ein **waagrechter Lautstärkeregler** (`state.volume`). Dieselbe Auswahl
     mit Regler auch oben in der Meditations-Ansicht. Am Ende der Meditation blendet der Klang aus.
-  - **Gong nur zu Beginn** der Meditation, nicht zwischen den Phasen. Klang: tiefe Klangschale, 4 Sekunden
-    (vorläufig Probe „1b“, 110 Hz; der Inhaber hat noch nicht endgültig gewählt; Proben: `werkzeuge/gong.py`).
+  - **Kein Gong** (Inhaber, 7. Oktober 2026: ersatzlos gestrichen, vorher eine Klangschale zu Beginn). Die Meditation
+    beginnt nach 2 Sekunden Ruhe mit dem ersten Satz.
   - Phasen bleiben immer in derselben Reihenfolge.
   - **Sätze nacheinander mit einstellbarer Sprechpause** (Inhaber, 6. Oktober 2026): zuerst 1,1 s, dann „etwas länger“,
     Standard jetzt 2,0 s, im Admin-Bereich unter „Einstellungen“ 0,5–10 s in Zehntelsekunden (`settings.pause` in
@@ -130,10 +140,12 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
   `js/aufnahmen.js` und die Liste in `sw.js`); danach `js/aufnahmen.js` in `index.html` vor `stimme.js` eintragen,
   `media-src` um `blob:` ergänzen und die App auf die Tonspur umbauen. Herkunft der Stimme dann in `stimme/QUELLE.md`.
 - iPhone mit gesperrtem Bildschirm: Safari hält dann Zeitgeber und Sprachausgabe an. Plan: Mit den Aufnahmen die
-  ganze Meditation als **eine durchgehende Tonspur** abspielen (Sätze, Stille, Gong zusammengesetzt, `<audio>`),
+  ganze Meditation als **eine durchgehende Tonspur** abspielen (Sätze und Stille zusammengesetzt, `<audio>`),
   die läuft auch gesperrt weiter und ignoriert den Stumm-Schalter. Bis dahin bleibt der Bildschirm an (Wake Lock).
   Auf dem iPhone des Inhabers testen (als Symbol auf dem Home-Bildschirm, dann bleibt auch die Offline-Kopie dauerhaft).
-- Gestaltung (Farben, Meditations-Ansicht, Symbol, Name) in Varianten vorlegen; Ton der Texte mit dem Inhaber abstimmen.
+- **App-Symbol: Variante C des Inhabers (7. Oktober 2026):** schlichter Nadelbaum im Profil aus drei weichen Ebenen
+  (Dunkelgrün #2f4a3a), dahinter blassgrüner Mond, Stamm und Boden in Erdtönen, Creme-Grund; `werkzeuge/symbole.py`.
+- Gestaltung (Farben, Meditations-Ansicht, Name) in Varianten vorlegen; Ton der Texte mit dem Inhaber abstimmen.
 - **Audit (Inhaber, Oktober 2026):** Wenn der Aufbau fertig ist und vor den Texten ein umfassendes Audit der
   Meditations-App über alle Bereiche aus `~/.claude/CLAUDE.md` („Audits“), mit Bericht; danach das Retro-Cockpit.
 - Automatische Tests (`werkzeuge/tests.py` nach Vorlage des Retro-Cockpits) fehlen noch.
@@ -141,14 +153,54 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
   geprüft, keine versteckten Ordner wie `.git`, keine Ordnerlisten), Datenschutzseite auf die Aufnahmen angepasst, keine
   persönlichen Angaben in Projektdateien („der Inhaber“); erstes Hochladen als neue Geschichte (siehe oben).
 
+## Stimmen (Stand 7. Oktober 2026)
+
+- **Wahl des Inhabers (7. Oktober 2026): Chatterbox mit Vorlage „Karlsson“** (`chatterbox`/`karlsson`), Tempo 100 %.
+  **Vertonung erst nach ausdrücklicher Zustimmung des Inhabers starten** (dauert etwa 3 Stunden; Umstellen der Stimme über
+  `/api/speichern` startet sie sofort). Bis dahin bleibt Piper Thorsten (A2) aktiv. `datenschutz.html` und
+  `stimme/QUELLE.md` nennen schon beide Stimmen (Chatterbox von Resemble AI, MIT; Vorlage mit der Piper-Stimme
+  de_DE-karlsson-low aus einem eigenen Probetext erzeugt, die auf dem M-AILABS-Datensatz beruht; unhörbares Wasserzeichen).
+  **Ablauf (Inhaber, 7. Oktober 2026):** Code mergen, dann abends im Admin-Bereich Chatterbox/Karlsson wählen, Claude-App
+  und Browser schließen (Speicher), am nächsten Morgen **erst anhören** (▶, „Neu sprechen“), dann selbst veröffentlichen,
+  nicht automatisch.
+- **Einstellungen der Stimme: Variante A „im Admin-Bereich“** (Wahl des Inhabers, 7. Oktober 2026).
+- XTTS-v2 ist gelöscht (Programm, Modell, Hörproben, Zwischenspeicher; Wunsch des Inhabers nach seiner Wahl). Piper bleibt
+  als schnelle Ersatzstimme.
+- **Mehrere Sprachprogramme** (Wunsch des Inhabers: am Ende nur noch Programm und eine von etwa fünf Stimmen wählen, danach
+  soll es direkt funktionieren): `werkzeuge/stimmen.json` (Katalog: Programme Piper und Chatterbox mit je fünf
+  Stimmen, Ordner unter `~/.local/share/`, Hörprobe), `werkzeuge/sprecher.py` (läuft in der Python-Umgebung des Programms,
+  spricht Satz für Satz als WAV, offline: `HF_HUB_OFFLINE=1`), `werkzeuge/aufnahmen.py` (System-Python: liest Texte und
+  `settings.stimme`, Rohaufnahmen-Zwischenspeicher `~/.local/share/meditation-app/rohaufnahmen/<programm>-<stimme>/`,
+  daraus MP3 mit Tempo per Rubber Band, tonhöhenerhaltend; Liste erst am Ende ausgetauscht, bis dahin die alte Stimme).
+  Piper Thorsten bei 100 % behält die alten Dateinamen (keine neuen Aufnahmen nötig).
+- Wahl im Admin-Bereich unter „Einstellungen“ (Variante A): Programm-Umschalter, Stimmen mit Hörprobe und „Wählen“ (mit Rückgängig), Sprechtempo 80–120 %, Pause.
+  `config.js` `settings.stimme = {programm, stimme, tempo}` (fehlt = Standard), geprüft in `cleanVoice` und im Helfer.
+- **Chatterbox auf diesem Rechner (gemessen 7. Oktober 2026):** Laden ~2 Min., 50–80 s je Satz (4 Rechenkerne, Standard),
+  **~5 GB Arbeitsspeicher** bei 7,5 GB im Rechner. Läuft die Claude-App gleichzeitig, beendet der Speicher-Notfallschutz
+  Prozesse (so zweimal am 7. Oktober 2026). Lange Vertonungen deshalb ohne Claude-App und ohne Browser laufen lassen.
+  Der Helfer verhindert während einer Vertonung den Ruhezustand (`systemd-inhibit`, sonst schläft der Rechner nach
+  15 Minuten ein) und setzt nach einem Neustart eine unfertige Vertonung von selbst fort. Startet Claude den Helfer neu,
+  dann als eigener Dienst (`systemd-run --user --unit=meditation-helfer …`), damit er nicht mit der Claude-App endet.
+- Wartezeiten: Pause sofort; Tempo etwa 1–2 Min. (umrechnen); neue Stimme einmal alle Sätze: Piper ~3 Min., Chatterbox ~60 s
+  je Satz auf diesem Rechner; zurück zu einer benutzten Stimme schnell.
+- Entscheidungsvorlage mit allen Hörproben: `hoerproben/entscheidung/index.html` (lokal, von Git ausgenommen), auch als
+  private Seite auf claude.ai (fürs iPhone). Code auf Arbeitskopie `stimmen-wahl` (lokal gespeichert, Hochladen nur nach
+  OK); der Admin-Helfer läuft bereits mit diesem Stand. Eine neue Stimme lässt sich auch vor dem Mergen veröffentlichen
+  (Format der Aufnahmen unverändert, die App ignoriert `settings.stimme`).
+  `~/.pkuseg` gehört zu Chatterbox.
+  Bei MLS-Stimmen (CC BY 4.0) Namensnennung in `datenschutz.html`; Herkunft in `stimme/QUELLE.md`.
+- Sicherheit: nur Stimmen, die für Sprachsynthese freigegeben sind (Thorsten CC0, Karlsson M-AILABS, MLS CC BY 4.0),
+  keine Stimmen realer Privatpersonen nachgeahmt. Modelle mit geprüften Prüfsummen, geladen mit
+  `weights_only`/safetensors. Chatterbox lud beim ersten Start `spacy_ontonotes.zip` (Explosion/spaCy auf GitHub,
+  SHA-256 b216e7f9…, nur msgpack und npz ohne Pickle) nach `~/.pkuseg`.
+
 ## Weiter am nächsten Tag (Stand 6. Oktober 2026, abends)
 
 - **Stimme natürlicher machen:** Hörproben `hoerproben/vergleich/` (1 Piper wie jetzt, 2 Piper lebendiger:
   length 1,2, noise 0,85, noise-w 1,1) – **„lebendiger“ ist laut Inhaber schlechter, Piper-Einstellungen bleiben (A2)**. Als Nächstes: XTTS-v2 mit Thorsten-Vorlage installieren (2–3 GB, eigener Ordner,
   vorher Sicherheitsprüfung wie bei Piper erklären) und Proben 3/4 erzeugen; Alternativen für Deutsch: Azure
   Killian/Conrad (Konto nötig), ElevenLabs (bezahlt). Der Inhaber entscheidet nach Gehör.
-- **Arbeitskopie `korrektur/pause-vorschau`** (Übernahme-Anfrage #1): enthält zusätzlich die Satz-Pausen und neue
-  Aufnahmen; lokal gespeichert, **Hochladen nur nach OK**.
+- Übernahme-Anfragen #1 und #2 sind gemergt (Satz-Pausen, iPhone: Restzeit sichtbar, Aufnahmen robust); online geprüft.
 - Danach: durchgehende Tonspur fürs gesperrte iPhone, iPhone-Test, automatische Tests, Audit (alle Bereiche).
 
 ## Erkenntnisse aus dem Retro-Cockpit
@@ -248,6 +300,12 @@ Admin-Modus), gilt hier nicht.
   und Zeitgeber.
 
 ### Git und Veröffentlichen
+
+- **Erst Code, dann Daten (Fehler 7. Oktober 2026):** „Für alle veröffentlichen“ im Admin-Bereich lädt Daten (config.js,
+  `stimme/`, `js/aufnahmen.js`) direkt auf main, unabhängig von offenen Übernahme-Anfragen. Ändert sich das **Format**
+  dieser Daten (z. B. Aufnahmen je Satz), muss der Code, der es liest, **vorher** auf main sein, sonst bricht die
+  veröffentlichte App (Folge damals: auf dem iPhone sprach die Browser-Stimme). Neue Formate deshalb immer rückwärts-
+  verträglich lesen und Format-Änderungen erst nach dem Mergen des Codes veröffentlichen.
 
 - GitHub Pages aus Branch `main`. Arbeit auf einer Arbeitskopie (Branch), dann Übernahme-Anfrage; der Inhaber mergt (Squash).
 - Commit-Identität in diesem Ordner: `Fishfan33` mit der GitHub-noreply-Adresse (lokal eingestellt).

@@ -8,7 +8,8 @@ Braucht Chromium (zeichnet die SVG-Vorlage) und Pillow (verkleinert sauber). Erg
 - icon-192.png, -512.png Installation (Android, Computer), abgerundet mit durchsichtigen Ecken
 - icon-maskable-512.png  Android schneidet selbst eine Form aus: volle Fläche, Motiv kleiner in der Mitte
 - apple-touch-icon.png   iPhone/iPad (180 px), volle Fläche, iOS rundet die Ecken selbst
-Motiv vorläufig (der Inhaber wählt noch aus Varianten): warmes Licht über ruhigem Wasser, Nachthimmel.
+Motiv: Variante C des Inhabers (7. Oktober 2026): schlichter Nadelbaum im Profil aus drei weichen Ebenen in Dunkelgrün,
+dahinter ein blassgrüner Mond, Stamm und Boden in Erdtönen, heller Creme-Grund (Farben der App).
 """
 import subprocess
 import tempfile
@@ -17,24 +18,20 @@ from pathlib import Path
 from PIL import Image
 
 OUT = Path(__file__).resolve().parent.parent / "icons"
-BG_TOP, BG_BOTTOM, GLOW, WAVE = "#2a3150", "#141826", "#e8b465", "#8fb0d9"
+GRUND, MOND, BAUM, STAMM, BODEN = "#fffaf3", "#dfe6d4", "#2f4a3a", "#8a6246", "#c9a487"
 
 
 def svg(scale, rounded):
-    """Motiv auf 512 × 512: leuchtender Kreis, darunter zwei sanfte Wellen."""
+    """Motiv auf 512 × 512 (gezeichnet auf 100 × 100, dann vergrößert)."""
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">'
-            f'<defs><linearGradient id="h" x1="0" y1="0" x2="0" y2="1">'
-            f'<stop offset="0" stop-color="{BG_TOP}"/><stop offset="1" stop-color="{BG_BOTTOM}"/></linearGradient>'
-            f'<radialGradient id="g"><stop offset=".55" stop-color="{GLOW}"/>'
-            f'<stop offset=".7" stop-color="{GLOW}" stop-opacity=".35"/><stop offset="1" stop-color="{GLOW}" stop-opacity="0"/>'
-            f'</radialGradient></defs>'
-            f'<rect width="512" height="512" rx="{112 if rounded else 0}" fill="url(#h)"/>'
-            f'<g transform="translate(256 256) scale({scale}) translate(-256 -256)">'
-            f'<circle cx="256" cy="214" r="150" fill="url(#g)"/>'
-            f'<path d="M96 346c40-22 80-22 120 0s80 22 120 0 80-22 100-11" stroke="{WAVE}" stroke-width="18" '
-            f'stroke-linecap="round" fill="none"/>'
-            f'<path d="M136 406c30-16 60-16 90 0s60 16 90 0 50-14 60-8" stroke="{WAVE}" stroke-opacity=".6" '
-            f'stroke-width="16" stroke-linecap="round" fill="none"/></g></svg>\n')
+            f'<rect width="512" height="512" rx="{112 if rounded else 0}" fill="{GRUND}"/>'
+            f'<g transform="translate(256 256) scale({scale}) translate(-256 -256) scale(5.12)">'
+            f'<circle cx="50" cy="46" r="30" fill="{MOND}"/>'
+            f'<rect x="48.5" y="66" width="3" height="16" rx="1.5" fill="{STAMM}"/>'
+            f'<path d="M50 16 L62 36 Q50 33 38 36 Z" fill="{BAUM}"/>'
+            f'<path d="M50 28 L66 52 Q50 48 34 52 Z" fill="{BAUM}"/>'
+            f'<path d="M50 42 L70 69 Q50 64 30 69 Z" fill="{BAUM}"/>'
+            f'<path d="M22 82 H78" stroke="{BODEN}" stroke-width="2.5" stroke-linecap="round"/></g></svg>\n')
 
 
 def render(svg_text, size, path):

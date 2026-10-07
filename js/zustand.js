@@ -55,9 +55,23 @@ function cleanSounds(raw) {
 // Einstellungen aus dem Admin-Bereich. Sprechpause zwischen zwei Sätzen in Sekunden (Inhaber, Oktober 2026: etwas
 // länger als zuvor 1,1 s, im Admin-Bereich einstellbar), 0,5 bis 10 s in Zehntelsekunden.
 const PAUSE_MIN = .5, PAUSE_MAX = 10, PAUSE_DEFAULT = 2;
+// Stimme für die Aufnahmen (nur Admin-Bereich und werkzeuge/aufnahmen.py, die App spielt einfach die Aufnahmen):
+// Programm und Stimme aus werkzeuge/stimmen.json, Sprechtempo 80–120 % in 5-%-Schritten. null = Standard
+// (Piper „Thorsten“, Tempo 100 %).
+const TEMPO_MIN = .8, TEMPO_MAX = 1.2;
+const VOICE_DEFAULT = { programm: "piper", stimme: "thorsten", tempo: 1 };
+function cleanVoice(raw) {
+  const id = v => typeof v === "string" && /^[a-z0-9-]{1,40}$/.test(v);
+  if (!raw || typeof raw !== "object" || !id(raw.programm) || !id(raw.stimme)) return null;
+  const t = Number(raw.tempo);
+  const tempo = Number.isFinite(t) ? Math.round(Math.min(TEMPO_MAX, Math.max(TEMPO_MIN, t)) * 20) / 20 : 1;
+  const v = { programm: raw.programm, stimme: raw.stimme, tempo };
+  return Object.keys(v).every(k => v[k] === VOICE_DEFAULT[k]) ? null : v;
+}
 function cleanSettings(raw) {
   const p = Number(raw?.pause);
-  return { pause: Number.isFinite(p) ? Math.round(Math.min(PAUSE_MAX, Math.max(PAUSE_MIN, p)) * 10) / 10 : PAUSE_DEFAULT };
+  return { pause: Number.isFinite(p) ? Math.round(Math.min(PAUSE_MAX, Math.max(PAUSE_MIN, p)) * 10) / 10 : PAUSE_DEFAULT,
+    stimme: cleanVoice(raw?.stimme) };
 }
 const CONFIG = window.MEDITATION_CONFIG && typeof window.MEDITATION_CONFIG === "object" ? window.MEDITATION_CONFIG : null;
 let sayings = cleanSayings(CONFIG?.sayings ?? DEFAULT_SAYINGS);

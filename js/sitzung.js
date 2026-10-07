@@ -3,10 +3,10 @@
 // Reihenfolge aus index.html geladen werden (Phasen zuerst, Start zuletzt). Übersicht: CLAUDE.md, „Aufbau“.
 
 // ---------- Ablauf berechnen ----------
-// Aus dem Plan wird beim Starten eine Zeitleiste von Ereignissen (Sekunden ab Start): Gong nur zu Beginn (Inhaber),
-// dann je Phase ihre Sätze fast nahtlos nacheinander, nur mit einer kurzen Sprechpause (Inhaber, Oktober 2026).
+// Aus dem Plan wird beim Starten eine Zeitleiste von Ereignissen (Sekunden ab Start): je Phase ihre Sätze fast nahtlos
+// nacheinander, nur mit einer kurzen Sprechpause (Inhaber, Oktober 2026). Kein Gong (gestrichen, Inhaber, 7. Oktober 2026).
 // Sind alle Sätze einer Phase gesagt und ist noch Zeit, geht es von vorn los.
-const LEAD = GONG_SECONDS + 1.5;   // erster Satz, wenn der Gong verklungen ist
+const LEAD = 2;                    // kurze Ruhe vor dem ersten Satz (darin lädt auch seine Aufnahme)
 const PHASE_LEAD = 1.5;            // kurze Pause beim Übergang in die nächste Phase
 // Sprechpause nach jedem Satz: settings.pause (im Admin-Bereich einstellbar, Standard 2 s)
 
@@ -28,7 +28,7 @@ function phaseLines(i, avail) {
 // Ereignisse der ganzen Meditation. Läuft der letzte Satz einer Phase über ihr Ende, beginnt die nächste Phase
 // erst danach (mit kurzer Pause), damit nie zwei Sätze übereinander liegen.
 function buildSession() {
-  const phases = [], events = [{ t: 0, kind: "gong" }];
+  const phases = [], events = [];
   let t = 0, free = 0;   // free: ab wann die Stimme wieder frei ist
   state.plan.forEach((s, i) => {
     if (!s.active) return;
@@ -73,7 +73,7 @@ function startSession() {
   if (!state.plan.some(isOn)) return;
   audioUnlock();
   session = { ...buildSession(), t0: performance.now(), next: 0, paused: false, pausedAt: 0, lastSay: null, done: false };
-  // Aufnahmen der Sätze schon laden, während der Gong klingt
+  // Aufnahmen der Sätze gleich beim Starten laden (vor dem ersten Satz liegen 2 Sekunden Ruhe)
   preloadRecordings([...new Set(session.events.filter(e => e.kind === "say").map(e => e.text))]);
   $s("sBar").innerHTML = session.phases.map(ph =>
     `<span class="s-seg" style="flex:${ph.end - ph.start};--ct:var(--p${ph.i + 1}-dark)"><span class="s-fill"></span></span>`).join("");
@@ -106,8 +106,7 @@ function tick() {
 }
 
 function fire(ev, late) {
-  if (ev.kind === "gong") { if (late < 3) gong(); }
-  else if (ev.kind === "say") {
+  if (ev.kind === "say") {
     session.lastSay = ev;
     showLine(ev.text);
     if (late < 2) speak(ev.text);
@@ -163,7 +162,7 @@ function togglePause() {
   tick();
 }
 
-// Zur nächsten Phase springen (mit Gong); in der letzten Phase zum Ende
+// Zur nächsten Phase springen; in der letzten Phase zum Ende
 function nextPhase() {
   if (!session || session.done) return;
   const t = elapsed();
