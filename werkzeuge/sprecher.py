@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Spricht Sätze mit einem Sprachprogramm (Piper, XTTS-v2 oder Chatterbox) – Hilfsprogramm für werkzeuge/aufnahmen.py.
+"""Spricht Sätze mit einem Sprachprogramm (Piper oder Chatterbox) – Hilfsprogramm für werkzeuge/aufnahmen.py.
 
     <ordner>/venv/bin/python werkzeuge/sprecher.py <programm> <stimme>
 
@@ -29,7 +29,6 @@ THREADS = int(os.environ.get("MEDITATION_THREADS") or max(1, (os.cpu_count() or 
 # Dann werden die Sätze neu gesprochen (sie steckt im Namen des Zwischenspeichers).
 PARAMETER = {
     "piper": {"v": 1, "satzpause": 0.7},
-    "xtts": {"v": 1, "temperature": 0.6, "speed": 0.9, "top_p": 0.85, "repetition_penalty": 5.0},
     "chatterbox": {"v": 1, "exaggeration": 0.4, "cfg_weight": 0.3, "temperature": 0.7},
 }
 
@@ -78,29 +77,6 @@ def piper(stimme, ordner):
     return sprechen
 
 
-def xtts(stimme, ordner):
-    import warnings
-    warnings.filterwarnings("ignore")
-    import torch
-    from TTS.tts.configs.xtts_config import XttsConfig
-    from TTS.tts.models.xtts import Xtts
-    torch.set_num_threads(THREADS)
-    cfg = XttsConfig(); cfg.load_json(str(ordner / "modell/config.json"))
-    m = Xtts.init_from_config(cfg); m.load_checkpoint(cfg, checkpoint_dir=str(ordner / "modell"), eval=True)
-    if stimme.get("studio"):
-        spk = torch.load(ordner / "modell/speakers_xtts.pth", weights_only=True)[stimme["studio"]]
-        lat, emb = spk["gpt_cond_latent"], spk["speaker_embedding"]
-    else:
-        lat, emb = m.get_conditioning_latents(audio_path=[str(VORLAGEN / stimme["vorlage"])])
-    p = {k: v for k, v in PARAMETER["xtts"].items() if k != "v"}
-
-    def sprechen(text, ziel):
-        torch.manual_seed(samen(text))
-        y = m.inference(text, "de", lat, emb, enable_text_splitting=False, **p)["wav"]
-        wav_schreiben(ziel, float_zu_int16(y), 24000)
-    return sprechen
-
-
 def chatterbox(stimme, ordner):
     import warnings
     warnings.filterwarnings("ignore")
@@ -126,7 +102,7 @@ def main():
     sys.stdout = sys.stderr
     programm, name = sys.argv[1], sys.argv[2]
     eintrag = katalog()[programm]
-    sprechen = {"piper": piper, "xtts": xtts, "chatterbox": chatterbox}[programm](
+    sprechen = {"piper": piper, "chatterbox": chatterbox}[programm](
         eintrag["stimmen"][name], DATEN / eintrag["ordner"])
     print("BEREIT", file=antwort, flush=True)
     for zeile in sys.stdin:

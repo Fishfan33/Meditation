@@ -12,18 +12,6 @@
    "mls-3503": {"name": "Sprecher 3503", "modell": "de_DE-mls-medium", "sprecher": "3503", "length_scale": 1.15, "probe": "piper-5-mls-3503.mp3"}
   }
  },
- "xtts": {
-  "name": "XTTS-v2",
-  "ordner": "meditation-xtts",
-  "sekunden_je_satz": 30,
-  "stimmen": {
-   "thorsten": {"name": "Thorsten", "vorlage": "thorsten.wav", "probe": "xtts-1-thorsten.mp3"},
-   "thorsten-schlaefrig": {"name": "Thorsten schläfrig", "vorlage": "thorsten-schlaefrig.wav", "probe": "xtts-2-thorsten-schlaefrig.mp3"},
-   "karlsson": {"name": "Karlsson", "vorlage": "karlsson.wav", "probe": "xtts-3-karlsson.mp3"},
-   "baldur": {"name": "Baldur (Studio)", "studio": "Baldur Sanjin", "probe": "xtts-4-baldur.mp3"},
-   "damien": {"name": "Damien (Studio)", "studio": "Damien Black", "probe": "xtts-5-damien.mp3"}
-  }
- },
  "chatterbox": {
   "name": "Chatterbox",
   "ordner": "meditation-chatterbox",

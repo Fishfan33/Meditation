@@ -277,8 +277,8 @@ def vertonen_anstossen(root):
     with VERTONUNG_SPERRE:
         if VERTONUNG["laeuft"]:
             VERTONUNG["nochmal"] = True
-            # Neue Stimme oder neues Tempo: den laufenden Durchgang nicht zu Ende bringen (das kann bei XTTS oder
-            # Chatterbox über eine Stunde dauern), sondern gleich mit der neuen Wahl beginnen. Schon gesprochene Sätze
+            # Neue Stimme oder neues Tempo: den laufenden Durchgang nicht zu Ende bringen (das kann bei
+            # Chatterbox Stunden dauern), sondern gleich mit der neuen Wahl beginnen. Schon gesprochene Sätze
             # liegen im Zwischenspeicher und werden nicht noch einmal gesprochen.
             prozess = VERTONUNG["prozess"]
             if prozess and VERTONUNG["wahl"] != gewaehlte_stimme(root):

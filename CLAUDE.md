@@ -144,29 +144,35 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
 
 ## Stimmen (Stand 7. Oktober 2026)
 
+- **Wahl des Inhabers (7. Oktober 2026): Chatterbox mit Vorlage „Karlsson“** (`chatterbox`/`karlsson`), Tempo 100 %.
+  **Vertonung erst nach ausdrücklicher Zustimmung des Inhabers starten** (dauert etwa 3 Stunden; Umstellen der Stimme über
+  `/api/speichern` startet sie sofort). Bis dahin bleibt Piper Thorsten (A2) aktiv. Nach der Vertonung: „Für alle
+  veröffentlichen“, `datenschutz.html` (Vorlesen und Quellen: Chatterbox von Resemble AI, MIT; Vorlage Karlsson aus dem
+  M-AILABS-Datensatz, BSD-artige Lizenz; unhörbares Wasserzeichen, keine Daten über Hörer) und `stimme/QUELLE.md` anpassen.
+- **Einstellungen der Stimme: Variante A „im Admin-Bereich“** (Wahl des Inhabers, 7. Oktober 2026).
+- XTTS-v2 ist gelöscht (Programm, Modell, Hörproben, Zwischenspeicher; Wunsch des Inhabers nach seiner Wahl). Piper bleibt
+  als schnelle Ersatzstimme.
 - **Mehrere Sprachprogramme** (Wunsch des Inhabers: am Ende nur noch Programm und eine von etwa fünf Stimmen wählen, danach
-  soll es direkt funktionieren): `werkzeuge/stimmen.json` (Katalog: Programme Piper, XTTS-v2, Chatterbox mit je fünf
+  soll es direkt funktionieren): `werkzeuge/stimmen.json` (Katalog: Programme Piper und Chatterbox mit je fünf
   Stimmen, Ordner unter `~/.local/share/`, Hörprobe), `werkzeuge/sprecher.py` (läuft in der Python-Umgebung des Programms,
   spricht Satz für Satz als WAV, offline: `HF_HUB_OFFLINE=1`), `werkzeuge/aufnahmen.py` (System-Python: liest Texte und
   `settings.stimme`, Rohaufnahmen-Zwischenspeicher `~/.local/share/meditation-app/rohaufnahmen/<programm>-<stimme>/`,
   daraus MP3 mit Tempo per Rubber Band, tonhöhenerhaltend; Liste erst am Ende ausgetauscht, bis dahin die alte Stimme).
   Piper Thorsten bei 100 % behält die alten Dateinamen (keine neuen Aufnahmen nötig).
-- Wahl im Admin-Bereich unter „Einstellungen“ (Variante A „im Admin-Bereich“, Claudes Empfehlung, mit dem Inhaber noch nicht
-  entschieden): Programm-Umschalter, Stimmen mit Hörprobe und „Wählen“ (mit Rückgängig), Sprechtempo 80–120 %, Pause.
+- Wahl im Admin-Bereich unter „Einstellungen“ (Variante A): Programm-Umschalter, Stimmen mit Hörprobe und „Wählen“ (mit Rückgängig), Sprechtempo 80–120 %, Pause.
   `config.js` `settings.stimme = {programm, stimme, tempo}` (fehlt = Standard), geprüft in `cleanVoice` und im Helfer.
-- Wartezeiten: Pause sofort; Tempo etwa 1–2 Min. (umrechnen); neue Stimme einmal alle Sätze: Piper ~3 Min., XTTS ~30 s und
-  Chatterbox ~60 s je Satz auf diesem Rechner; zurück zu einer benutzten Stimme schnell.
+- Wartezeiten: Pause sofort; Tempo etwa 1–2 Min. (umrechnen); neue Stimme einmal alle Sätze: Piper ~3 Min., Chatterbox ~60 s
+  je Satz auf diesem Rechner; zurück zu einer benutzten Stimme schnell.
 - Entscheidungsvorlage mit allen Hörproben: `hoerproben/entscheidung/index.html` (lokal, von Git ausgenommen), auch als
   private Seite auf claude.ai (fürs iPhone). Code auf Arbeitskopie `stimmen-wahl` (lokal gespeichert, Hochladen nur nach
   OK); der Admin-Helfer läuft bereits mit diesem Stand. Eine neue Stimme lässt sich auch vor dem Mergen veröffentlichen
   (Format der Aufnahmen unverändert, die App ignoriert `settings.stimme`).
-  **Nach der Wahl des Inhabers:** das andere Programm löschen (Ordner `~/.local/share/meditation-xtts` bzw.
-  `meditation-chatterbox`, seine Hörproben, Rohaufnahmen und Einträge in `stimmen.json`), `~/.pkuseg` gehört zu Chatterbox.
+  `~/.pkuseg` gehört zu Chatterbox.
   Bei MLS-Stimmen (CC BY 4.0) Namensnennung in `datenschutz.html`; Herkunft in `stimme/QUELLE.md`.
-- Sicherheit: nur Stimmen, die für Sprachsynthese freigegeben sind (Thorsten CC0, Karlsson M-AILABS, MLS CC BY 4.0,
-  XTTS-Studiostimmen), keine Stimmen realer Privatpersonen nachgeahmt. Modelle mit geprüften Prüfsummen, geladen mit
+- Sicherheit: nur Stimmen, die für Sprachsynthese freigegeben sind (Thorsten CC0, Karlsson M-AILABS, MLS CC BY 4.0),
+  keine Stimmen realer Privatpersonen nachgeahmt. Modelle mit geprüften Prüfsummen, geladen mit
   `weights_only`/safetensors. Chatterbox lud beim ersten Start `spacy_ontonotes.zip` (Explosion/spaCy auf GitHub,
-  SHA-256 b216e7f9…, nur msgpack und npz ohne Pickle) nach `~/.pkuseg`. XTTS-v2: Lizenz nur nicht-kommerziell (CPML).
+  SHA-256 b216e7f9…, nur msgpack und npz ohne Pickle) nach `~/.pkuseg`.
 
 ## Weiter am nächsten Tag (Stand 6. Oktober 2026, abends)
 
