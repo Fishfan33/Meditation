@@ -75,6 +75,8 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
 
 - **Der Inhaber meditiert selbst**, hauptsächlich auf einem **iPhone** (Inhaber, Oktober 2026). Die App führt durch:
   Stimme, Text groß auf dunklem Bildschirm. Jede Änderung auch in iPhone-Größe prüfen.
+- **Admin-Bereich für den Laptop optimieren** (Inhaber, 8. Oktober 2026): Vorschläge und Prüfungen in Laptop-Größe;
+  die Handy-Ansicht des Admin-Bereichs ist nachrangig. Für die App selbst gilt weiter: auch in iPhone-Größe prüfen.
 - Phasen (Inhaber): 1 Einstimmung, 2 Bodyscan, 3 Kraftort, 4 Die Arbeit im Unterbewussten, 5 Rückkehr; alle an- und
   abwählbar. Zeiten: Gesamtdauer (10/20/30 oder eigene) wird verteilt, je Phase änderbar (wie im Retro-Cockpit).
 - Texte schreibt Claude als Vorschläge, der Inhaber streicht und ändert.
