@@ -15,7 +15,7 @@ const PHASE_LEAD = 1.5;            // kurze Pause beim Übergang in die nächste
 // gesprochen, auch wenn er etwas darüber hinausgeht; danach kommt keiner mehr (Inhaber, Oktober 2026).
 // Zufall: wird festgelegt, wenn die Texte fertig sind (Inhaber); bis dahin gilt die Standard-Reihenfolge.
 function phaseLines(i, avail) {
-  const pool = activeSayings(PHASES[i].id);
+  const pool = PHASES[i].id === "kraftort" ? placeSayings() : activeSayings(PHASES[i].id);   // Kraftort: gewählter Ort
   const lines = [];
   for (let k = 0, used = 0; pool.length && used < avail; k++) {
     const l = pool[k % pool.length];

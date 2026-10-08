@@ -61,11 +61,30 @@ function setRuler(v, smooth = false) {
 function chipsMarkup() {
   return PHASES.map((p, i) => {
     const s = state.plan[i];
+    const orte = p.id === "kraftort" ? placeGroups() : [];
+    if (orte.length) return placeChip(p, i, s, orte);
     return `<button class="chip${s.active ? "" : " off"}" data-chip="${i}" aria-pressed="${s.active}" style="--ph:var(--p${i + 1})"
       title="${s.active ? "Antippen zum Auslassen" : "Antippen zum Aufnehmen"}">
       <span class="chip-no" aria-hidden="true">${phaseNo(i) ?? ""}</span><span class="chip-name">${esc(p.name)}</span>
       <span class="chip-min">${s.active ? fmtMin(s.minutes) : "nicht dabei"}</span></button>`;
   }).join("");
+}
+// Kraftort mit Orten (Variante C des Inhabers): Antippen klappt die Orte auf; „Nicht dabei“ lässt die Phase aus.
+// Standard „Zufällig“; ist nur ein Ort aktiv, steht nur er da.
+function placeChip(p, i, s, orte) {
+  const gewaehlt = chosenPlace();
+  const name = gewaehlt ? gewaehlt.name : "Zufällig";
+  const chip = `<button class="chip${s.active ? "" : " off"}" data-chip="${i}" data-place-toggle aria-expanded="${s.active && state.ortOffen}"
+      aria-controls="placeOptions" style="--ph:var(--p${i + 1})" title="${s.active ? "Antippen, um den Ort zu wählen" : "Antippen zum Aufnehmen"}">
+      <span class="chip-no" aria-hidden="true">${phaseNo(i) ?? ""}</span>
+      <span class="chip-name">${esc(p.name)}${s.active ? ` <span class="chip-place">· ${esc(name)}</span>` : ""}</span>
+      <span class="chip-min">${s.active ? fmtMin(s.minutes) : "nicht dabei"}</span></button>`;
+  if (!s.active || !state.ortOffen) return chip;
+  const wahl = [...(orte.length > 1 ? [{ id: "zufall", name: "Zufällig" }] : []), ...orte];
+  const an = id => (orte.length === 1 || state.kraftort === id || (id === "zufall" && !gewaehlt));
+  return chip + `<div class="places" id="placeOptions" role="radiogroup" aria-label="Kraftort wählen">${wahl.map(o =>
+    `<button class="place${an(o.id) ? " on" : ""}" role="radio" aria-checked="${an(o.id)}" data-place="${esc(o.id)}">${esc(o.name)}</button>`).join("")}
+    <button class="place place-off" data-place-off>Nicht dabei</button></div>`;
 }
 
 // ---------- Hintergrundklang ----------

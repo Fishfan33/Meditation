@@ -91,6 +91,11 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
   - **Kein Gong** (Inhaber, 7. Oktober 2026: ersatzlos gestrichen, vorher eine Klangschale zu Beginn). Die Meditation
     beginnt nach 2 Sekunden Ruhe mit dem ersten Satz.
   - Phasen bleiben immer in derselben Reihenfolge.
+  - **Kraftort-Auswahl für Gäste (Wahl des Inhabers, Variante C, 8. Oktober 2026):** Antippen der Phase Kraftort klappt
+    die Orte als Knöpfe darunter auf (vorher verdeckt); Orte = im Admin-Bereich aktive Kraftort-Gruppen mit aktiven
+    Sprüchen. Standard „Zufällig“ (wählt beim Starten einen Ort); ist nur ein Ort aktiv, steht nur dieser da, ohne
+    „Zufällig“. Darunter „Nicht dabei“ zum Auslassen (Antippen nimmt die Phase wieder auf). Nur im Speicher
+    (`state.kraftort`, `placeGroups()`, `placeSayings()` in js/zustand.js).
   - **Sätze nacheinander mit einstellbarer Sprechpause** (Inhaber, 6. Oktober 2026): zuerst 1,1 s, dann „etwas länger“,
     Standard jetzt 2,0 s, im Admin-Bereich unter „Einstellungen“ 0,5–10 s in Zehntelsekunden (`settings.pause` in
     config.js, geprüft in `cleanSettings` und im Helfer); ist der Text einer Phase durch, geht es von vorn los.

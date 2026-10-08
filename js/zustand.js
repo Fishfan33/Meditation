@@ -10,7 +10,10 @@ const IS_LOCAL = location.protocol === "file:" || ["localhost", "127.0.0.1", "[:
 // ---------- Zustand ----------
 // Die App speichert nichts (Inhaber, Oktober 2026). Welche Sprüche kommen, wird erst beim Starten gemischt.
 // plan[i] gehört immer zu PHASES[i]: { active, minutes }
-let state = { duration: DURATION_DEFAULT, plan: PHASES.map(() => ({ active: true, minutes: 0 })), sound: "aus", volume: .55 };
+// kraftort: gewählter Ort (Gruppe im Kraftort) oder "zufall"; ortOffen: Auswahl unter der Phase aufgeklappt.
+// Nur im Speicher (die App speichert nichts), jede Sitzung beginnt mit „Zufällig“.
+let state = { duration: DURATION_DEFAULT, plan: PHASES.map(() => ({ active: true, minutes: 0 })), sound: "aus", volume: .55,
+  kraftort: "zufall", ortOffen: false };
 
 // ---------- Sprüche und Klänge ----------
 // Grundbestand aus js/texte.js; hat der Inhaber im Admin-Bereich etwas geändert, gilt seine Fassung aus config.js.
@@ -78,6 +81,21 @@ let sayings = cleanSayings(CONFIG?.sayings ?? DEFAULT_SAYINGS);
 let soundsOn = cleanSounds(CONFIG?.sounds);
 let settings = cleanSettings(CONFIG?.settings);
 const activeSayings = phaseId => spokenSayings(phaseId).map(s => s.text);
+// Kraftort-Auswahl (Inhaber, Oktober 2026, Variante C): die Orte = im Admin-Bereich aktive Gruppen mit aktiven Sprüchen.
+// Ist nur einer aktiv, gibt es nur diesen (ohne „Zufällig“). „Zufällig“ wählt beim Starten einen Ort.
+const placeGroups = () => sayings.kraftort.filter(e => isGroup(e) && e.active && e.items.some(s => s.active));
+function chosenPlace() {
+  const g = placeGroups();
+  if (g.length <= 1) return g[0] || null;
+  return g.find(x => x.id === state.kraftort) || null;   // null = zufällig
+}
+// Sätze des Kraftorts für diese Meditation: der gewählte Ort, bei „Zufällig“ einer davon; ohne Orte wie bisher alle
+function placeSayings(pick = () => Math.random()) {
+  const g = placeGroups();
+  if (!g.length) return activeSayings("kraftort");
+  const ort = chosenPlace() || g[Math.floor(pick() * g.length)];
+  return ort.items.filter(s => s.active).map(s => s.text);
+}
 const soundEnabled = id => id === "aus" || soundsOn[id] !== false;
 
 const isOn = s => s.active;
