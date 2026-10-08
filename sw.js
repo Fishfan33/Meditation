@@ -6,23 +6,24 @@
 // Ändert sich irgendeine App-Datei, ändert sich damit diese Datei: Der Browser installiert sie neu,
 // und die App bietet „Neue Version verfügbar, neu laden“ an (übernommen wird erst nach dem Klick).
 // Braucht die App eine neue Datei (Bild, Seite, Skript, Aufnahme), sie hier in FILES ergänzen.
-const VERSION = "ff08eeaa";
+const VERSION = "257b3ae3";
 const CACHE = "meditation-" + VERSION;
 const FILES = [
   "./",
   "datenschutz.html",
-  "app.css?v=46e9677b",
+  "app.css?v=3360769a",
   "js/phasen.js?v=4a1758aa",
   "js/texte.js?v=fa937935",
-  "js/zustand.js?v=d74f7eff",
+  "js/zustand.js?v=010f5d0c",
   "js/aufnahmen.js?v=3f983334",
-  "js/stimme.js?v=0ce11e53",
+  "js/stimme.js?v=0b24a166",
   "js/meldungen.js?v=7c55a041",
-  "js/plan.js?v=727a6b85",
-  "js/sitzung.js?v=c5b848a1",
-  "js/bedienung.js?v=7a5092f0",
+  "js/plan.js?v=c6d5388a",
+  "js/sitzung.js?v=15b16757",
+  "js/klangring.js?v=0b302aff",
+  "js/bedienung.js?v=446d21f7",
   "config.js?v=ca4a34b3",
-  "js/admin.js?v=5ab2ea2a",
+  "js/admin.js?v=f0295103",
   "js/start.js?v=bf25bd92",
   "manifest.json",
   "fonts/AtkinsonHyperlegible-Regular.woff2",

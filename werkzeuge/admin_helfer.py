@@ -20,7 +20,13 @@ admin-helfer.log daneben).
   einziger Durchgang werden. Pause, Reihenfolge, An/Aus, Gruppen und Klänge brauchen keine Vertonung.
   „Vertonung abbrechen“ (Inhaber, Oktober 2026, /api/vertonung-anhalten): beendet den laufenden Durchgang, nichts
   Neues beginnt mehr (auch nicht nach dem Speichern oder einem Neustart), bis „Fortsetzen“ (/api/vertonen). Schon
-  gesprochene Sätze bleiben im Zwischenspeicher. /api/herkunft: je Spruch, mit welcher Stimme er aufgenommen ist. Wechselt die
+  gesprochene Sätze bleiben im Zwischenspeicher. /api/herkunft: je Spruch, mit welcher Stimme er aufgenommen ist.
+- ElevenLabs (Import-Programm, Inhaber, Oktober 2026): Fehlen Sätze, legt der Helfer eine Textdatei mit genau diesen
+  Sätzen an (hoerproben/elevenlabs-auftraege/meditation-neu-<Zeit>.txt; der Admin-Bereich bietet sie zum Herunterladen
+  an). Den Studio-Export übernimmt der Knopf „Nach ElevenLabs-Downloads suchen“ (/api/elevenlabs-suchen, Wahl des
+  Inhabers: nur Knopf, kein Wächter): zuerst einen Export, dessen Name zur Textdatei passt
+  („ElevenLabs_meditation-neu-<Zeit>.mp3“), sonst den neuesten, wenn seine Länge zu den fehlenden Sätzen passt; danach
+  vertonen (werkzeuge/elevenlabs_import.py). Übernommene Exporte merkt sich der Helfer (elevenlabs-importiert.json). Wechselt die
   Stimme oder das Tempo während einer Vertonung, bricht der Helfer sie ab und beginnt mit der neuen (schon Gesprochenes
   bleibt im Zwischenspeicher). POST /api/stimmen liefert die Auswahl mit Hörproben, /api/neu-sprechen eine neue
   Variante eines Spruchs.
@@ -401,6 +407,127 @@ def vertonung_starten(root):
     threading.Thread(target=vertonen, args=(root,), daemon=True).start()
 
 
+# ---------- ElevenLabs: Text für fehlende Sätze, Export aus dem Download-Ordner übernehmen ----------
+DOWNLOADS = Path.home() / "Downloads"
+ELEVEN = {"text": None, "fehlt": 0, "meldung": ""}   # Datei zum Herunterladen, fehlende Sätze, letzte Übernahme
+
+
+def import_programm(root):
+    wahl = gewaehlte_stimme(root)
+    return wahl if stimmen_katalog().get(wahl["programm"], {}).get("import") else None
+
+
+def elevenlabs_auftrag(root):
+    """Nach einer Vertonung mit fehlenden Sätzen: Textdatei zum Hochladen in Studio (je Satz ein Absatz). Gleicher
+    Inhalt wie die letzte Datei: dieselbe Datei; sonst eine neue mit Uhrzeit im Namen (daran erkennt der Knopf den
+    Export wieder)."""
+    root = Path(root)
+    quelle = root / "hoerproben/elevenlabs-fehlend.txt"
+    ordner = root / "hoerproben/elevenlabs-auftraege"
+    if not import_programm(root) or not quelle.exists() or not fehlende(root):
+        ELEVEN.update(text=None, fehlt=0)
+        return
+    inhalt = quelle.read_text(encoding="utf-8")
+    ordner.mkdir(parents=True, exist_ok=True)
+    alle = sorted(ordner.glob("meditation-neu-*.txt"))
+    if alle and alle[-1].read_text(encoding="utf-8") == inhalt:
+        datei = alle[-1]
+    else:
+        datei = ordner / f"meditation-neu-{time.strftime('%Y-%m-%d-%H%M%S')}.txt"
+        datei.write_text(inhalt, encoding="utf-8")
+    ELEVEN.update(text=str(datei.relative_to(root)), fehlt=len([x for x in inhalt.split("\n\n") if x.strip()]))
+
+
+def importiert_datei():
+    return SICHERUNGEN.parent / "elevenlabs-importiert.json"   # schon übernommene Exporte (Name, Größe, Zeit)
+
+
+def kennung_export(f):
+    st = f.stat()
+    return f"{f.name}|{st.st_size}|{int(st.st_mtime)}"
+
+
+def schon_importiert():
+    try:
+        return set(json.loads(importiert_datei().read_text(encoding="utf-8")))
+    except (OSError, ValueError):
+        return set()
+
+
+def als_importiert_merken(f):
+    alle = schon_importiert() | {kennung_export(f)}
+    importiert_datei().parent.mkdir(parents=True, exist_ok=True)
+    importiert_datei().write_text(json.dumps(sorted(alle)), encoding="utf-8")
+
+
+def auftrag_zu(root, export):
+    """Textdatei, aus der dieser Export entstand: am Namen erkannt („ElevenLabs_meditation-neu-…(1).mp3“)."""
+    stamm = re.sub(r"^ElevenLabs_|\(\d+\)$", "", export.stem)
+    datei = Path(root) / "hoerproben/elevenlabs-auftraege" / f"{stamm}.txt"
+    return datei if datei.exists() else None
+
+
+def fertig_geschrieben(f):
+    if (f.parent / (f.name + ".part")).exists():
+        return False
+    groesse = f.stat().st_size
+    time.sleep(2)
+    return f.stat().st_size == groesse
+
+
+def elevenlabs_suchen(root):
+    """Knopf „Nach ElevenLabs-Downloads suchen“ (Inhaber, Oktober 2026): erst Exporte, deren Name passt; sonst der
+    neueste noch nicht übernommene Export, der nach der letzten Textdatei entstand – aber nur, wenn seine Länge zu den
+    Sätzen passt (sonst würde Falsches einsortiert)."""
+    root = Path(root)
+    if not import_programm(root):
+        raise Fehler("Die gewählte Stimme ist keine ElevenLabs-Stimme.")
+    if not DOWNLOADS.is_dir():
+        raise Fehler(f"Den Download-Ordner gibt es nicht ({DOWNLOADS.name}).")
+    fertig = schon_importiert()
+    neu = [f for f in sorted(DOWNLOADS.glob("ElevenLabs_*.mp3"), key=lambda f: f.stat().st_mtime, reverse=True)
+           if kennung_export(f) not in fertig]
+    passend = [f for f in neu if auftrag_zu(root, f)]
+    if passend:
+        f = passend[0]
+        ok = fertig_geschrieben(f) and elevenlabs_uebernehmen(root, f, auftrag_zu(root, f))
+        return {**status(root), "gefunden": f.name, "uebernommen": bool(ok)}
+    auftraege = sorted((root / "hoerproben/elevenlabs-auftraege").glob("meditation-neu-*.txt"))
+    if not auftraege or not ELEVEN["fehlt"]:
+        raise Fehler("Es fehlen gerade keine Sätze bei ElevenLabs." if not ELEVEN["fehlt"] else "Keine Textdatei vorhanden.")
+    texte = auftraege[-1]
+    kandidaten = [f for f in neu if f.stat().st_mtime > texte.stat().st_mtime]
+    if not kandidaten:
+        raise Fehler("Kein neuer ElevenLabs-Download gefunden. Bitte erst in ElevenLabs Studio exportieren.")
+    f = kandidaten[0]
+    saetze = [x for x in texte.read_text(encoding="utf-8").split("\n\n") if x.strip()]
+    erwartet = sum(len(x) for x in saetze) / 15.9 + 0.8 * (len(saetze) - 1)   # Helmut: ~16 Zeichen/s, ~0,8 s Pause
+    dauer = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(f)],
+                                 capture_output=True, text=True).stdout or 0)
+    if not 0.6 < dauer / max(erwartet, 0.5) < 1.6:
+        raise Fehler(f"{f.name} passt nicht zu den fehlenden Sätzen ({dauer:.0f} s statt etwa {erwartet:.0f} s).")
+    ok = fertig_geschrieben(f) and elevenlabs_uebernehmen(root, f, texte)
+    return {**status(root), "gefunden": f.name, "uebernommen": bool(ok)}
+
+
+def elevenlabs_uebernehmen(root, export, texte):
+    """Einen Studio-Export übernehmen: teilen, ablegen, vertonen. Das Ergebnis steht in der Statuszeile."""
+    root = Path(root)
+    wahl = import_programm(root)
+    if not wahl:
+        return False
+    r = subprocess.run([sys.executable, str(root / "werkzeuge/elevenlabs_import.py"), str(export), str(texte),
+                        wahl["stimme"]], cwd=root, capture_output=True, text=True)
+    zeile = (r.stdout.strip().splitlines() or [""])[-1] if r.returncode == 0 else (r.stderr or r.stdout).strip()[-200:]
+    ELEVEN["meldung"] = (f"Von ElevenLabs übernommen ({export.name}): {zeile}" if r.returncode == 0
+                         else f"Übernahme von {export.name} ging nicht: {zeile}")
+    print(ELEVEN["meldung"], flush=True)
+    if r.returncode == 0:
+        als_importiert_merken(export)
+        vertonen_anstossen(root, sofort=True, fortsetzen=True)
+    return r.returncode == 0
+
+
 def vertonen(root):
     while True:
         try:
@@ -416,9 +543,12 @@ def vertonen(root):
                                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
                                        start_new_session=True)
             VERTONUNG["prozess"] = prozess
-            letzte, gesamt, sprechen, beginn = "", 0, 0, None
+            letzte, gesamt, sprechen, beginn, import_fehlt = "", 0, 0, None, False
             for zeile in prozess.stdout:
                 zeile = zeile.rstrip()
+                if "fehlen noch bei" in zeile:   # Import-Stimme: Sätze fehlen (kein Fehler; systemd-inhibit schreibt danach noch eine Zeile)
+                    import_fehlt = True
+                    continue
                 letzte = zeile or letzte
                 # Prozent: Texte lesen bis 4 %, Programm laden bis 8 %, Sätze sprechen 8–85 % (ohne Umwandeln bis 92 %),
                 # umwandeln bis 92 %, Liste schreiben 92–100 %. Restzeit aus der bisherigen Zeit je Satz.
@@ -467,9 +597,11 @@ def vertonen(root):
                     VERTONUNG["prozent"] = 92 + 7 * int(m.group(1)) // max(1, int(m.group(2)))
                 elif zeile == "ENDE":
                     VERTONUNG.update(prozent=100, schritt="Fertig", rest=None)
-            if prozess.wait() and not VERTONUNG.get("abgebrochen"):
+            code = prozess.wait()
+            if code and not VERTONUNG.get("abgebrochen") and not import_fehlt:
                 raise Fehler(f"Die Vertonung ist abgebrochen: {letzte[:200]}")
             VERTONUNG["fehler"] = ""
+            elevenlabs_auftrag(root)   # fehlen Sätze bei ElevenLabs: Text zum Hochladen bereitlegen
         except (Fehler, OSError) as e:
             VERTONUNG["fehler"] = str(e)
             print(f"Vertonung: {e}", file=sys.stderr, flush=True)
@@ -489,7 +621,8 @@ def status(root):
     return {"ok": True, **{k: VERTONUNG[k] for k in ("laeuft", "geplant", "fertig", "gesamt", "aktuell", "fehler",
                                                       "stand", "prozent", "schritt", "rest", "stimme")},
             "fehlend": len(fehlende(root)), "offen": offen_zaehlen(root), "angehalten": angehalten(),
-            "veroeffentlichen": {k: AUFTRAG[k] for k in ("zustand", "meldung", "stand", "aenderungen")}}
+            "veroeffentlichen": {k: AUFTRAG[k] for k in ("zustand", "meldung", "stand", "aenderungen")},
+            "elevenlabs": dict(ELEVEN)}
 
 
 def neu_sprechen(entwurf, root):
@@ -738,6 +871,9 @@ def auftrag_ausfuehren(repo, kopie, nummer):
             time.sleep(1)
             continue
         if fehlende(repo):
+            if ELEVEN["fehlt"] and angestossen:   # wartet auf den ElevenLabs-Export (Knopf „Suchen“, danach wird vertont)
+                time.sleep(5)
+                continue
             if VERTONUNG["fehler"] and angestossen:
                 AUFTRAG.update(zustand="fehler", meldung="Nicht veröffentlicht: Die Vertonung ist nicht fertig geworden "
                                f"({VERTONUNG['fehler']}).")
@@ -866,6 +1002,7 @@ class Helfer(http.server.SimpleHTTPRequestHandler):
                                                 status(self.root))[1],
                     "/api/vertonung-anhalten": lambda e: vertonung_anhalten(self.root),
                     "/api/herkunft": lambda e: herkunft_liste(self.root),
+                    "/api/elevenlabs-suchen": lambda e: elevenlabs_suchen(self.root),
                     "/api/vorschau": lambda e: vorschau(e, self.root, self.kopie),
                     "/api/veroeffentlichen": lambda e: veroeffentlichen(e, self.root, self.kopie)}
         if pfad not in aktionen:
@@ -915,18 +1052,20 @@ def starten(root, port, kopie=KOPIE, adressen=("127.0.0.1", "127.0.0.2", "::1"))
         threading.Thread(target=s.serve_forever, daemon=True).start()
     # Nach einem Neustart (Rechner, Anmeldung): Fehlt noch etwas, geht die Vertonung von selbst weiter, wo sie war
     vertonen_anstossen(Path(root))
+    elevenlabs_auftrag(Path(root))
     return server
 
 
 def main():
-    global SICHERUNGEN
+    global SICHERUNGEN, DOWNLOADS
     a = argparse.ArgumentParser(description="Meditation lokal zeigen und Änderungen aus dem Admin-Bereich speichern.")
     a.add_argument("--ordner", default=str(ROOT), help="Ordner mit der App")
     a.add_argument("--port", type=int, default=PORT)
     a.add_argument("--kopie", default=str(KOPIE), help="Ordner für die eigene Kopie des Originals (main)")
     a.add_argument("--sicherungen", default=str(SICHERUNGEN), help="Ordner für die Sicherungen von config.js")
+    a.add_argument("--downloads", default=str(DOWNLOADS), help="Ordner, in dem ElevenLabs-Exporte ankommen")
     args = a.parse_args()
-    SICHERUNGEN = Path(args.sicherungen)
+    SICHERUNGEN, DOWNLOADS = Path(args.sicherungen), Path(args.downloads)
     starten(args.ordner, args.port, args.kopie)
     print(f"Meditation: http://localhost:{args.port}/ (Admin), http://127.0.0.2:{args.port}/ (öffentlich)", flush=True)
     threading.Event().wait()

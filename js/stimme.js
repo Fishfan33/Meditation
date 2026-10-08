@@ -52,6 +52,19 @@ function preloadRecordings(texts) {
   texts.reduce((kette, t) => kette.then(() => loadRecording(t)), Promise.resolve());
 }
 let voiceSources = [], speakToken = 0;
+// Die Stimme läuft über einen eigenen Weg mit Messpunkt (AnalyserNode) für den Klangring (js/klangring.js)
+let voiceBus = null, voiceAnalyser = null;
+function voiceOut() {
+  if (!voiceBus && audioCtx) {
+    voiceBus = audioCtx.createGain();
+    voiceAnalyser = audioCtx.createAnalyser();
+    voiceAnalyser.fftSize = 512;
+    voiceAnalyser.smoothingTimeConstant = .75;
+    voiceBus.connect(audioCtx.destination);
+    voiceBus.connect(voiceAnalyser);
+  }
+  return voiceBus || audioCtx.destination;
+}
 
 // Spruch vorlesen; `done` läuft, wenn er fertig ist (oder abgebrochen wurde). Die Sätze werden auf der Zeitachse des
 // Tons genau hintereinander gelegt, jeweils mit der eingestellten Pause dazwischen.
@@ -62,10 +75,11 @@ function speak(text, done) {
       if (token !== speakToken) return;   // inzwischen abgebrochen oder ein anderer Spruch
       if (!bufs) { speakFiles(recordingOf(text), token, () => speakSynth(text, done), done); return; }
       let t = audioCtx.currentTime + .02;
+      window.klangringWecken?.();   // der Ring zeichnet, solange gesprochen wird
       voiceSources = bufs.map((buf, k) => {
         const src = audioCtx.createBufferSource();
         src.buffer = buf;
-        src.connect(audioCtx.destination);
+        src.connect(voiceOut());
         src.start(t);
         t += buf.duration + settings.pause;
         if (k === bufs.length - 1) src.onended = () => { if (voiceSources.includes(src)) voiceSources = []; done?.(); };

@@ -37,7 +37,8 @@ Reines HTML/CSS/JS wie im Retro-Cockpit. Klassische Skripte in `js/`, Reihenfolg
   nichts Neues (auch nicht nach Speichern oder Neustart, gemerkt in `~/.local/share/meditation-app/vertonung-angehalten`),
   bis „Fortsetzen“. **Je Spruch die Stimme der gültigen Aufnahme** (Inhaber): „· Piper · Thorsten, 7. Okt., 14:32“ unter
   dem Text, aus den Dateinamen erkannt (`aufnahmen.herkunft()`, `/api/herkunft`).
-  „Frühere Stände“ unter „Einstellungen“.
+  „Frühere Stände“ unter „Einstellungen“. Knopf **„Fertig“** schließt den Admin-Bereich (alles ist schon gespeichert);
+  der Name bleibt (Inhaber, 8. Oktober 2026).
   **Schutz vor Überschreiben:** Speichern schickt den Fingerabdruck (`configStand`, SHA-256 von config.js) mit; hat sich
   config.js inzwischen geändert, lehnt der Helfer ab („KONFLIKT“), die Seite zeigt rot „Seite neu laden“. Claude ändert
   Sprüche nur über `/api/speichern` mit aktuellem Fingerabdruck (Sicherung und Vertonung inklusive), nie direkt in der Datei.
@@ -75,6 +76,8 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
 
 - **Der Inhaber meditiert selbst**, hauptsächlich auf einem **iPhone** (Inhaber, Oktober 2026). Die App führt durch:
   Stimme, Text groß auf dunklem Bildschirm. Jede Änderung auch in iPhone-Größe prüfen.
+- **Admin-Bereich für den Laptop optimieren** (Inhaber, 8. Oktober 2026): Vorschläge und Prüfungen in Laptop-Größe;
+  die Handy-Ansicht des Admin-Bereichs ist nachrangig. Für die App selbst gilt weiter: auch in iPhone-Größe prüfen.
 - Phasen (Inhaber): 1 Einstimmung, 2 Bodyscan, 3 Kraftort, 4 Die Arbeit im Unterbewussten, 5 Rückkehr; alle an- und
   abwählbar. Zeiten: Gesamtdauer (10/20/30 oder eigene) wird verteilt, je Phase änderbar (wie im Retro-Cockpit).
 - Texte schreibt Claude als Vorschläge, der Inhaber streicht und ändert.
@@ -91,6 +94,17 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
   - **Kein Gong** (Inhaber, 7. Oktober 2026: ersatzlos gestrichen, vorher eine Klangschale zu Beginn). Die Meditation
     beginnt nach 2 Sekunden Ruhe mit dem ersten Satz.
   - Phasen bleiben immer in derselben Reihenfolge.
+  - **Meditations-Ansicht (Wahl des Inhabers, 8. Oktober 2026):** Hintergrund **Tannengrün** wie im App-Symbol
+    (Variante C: #2f4a3a → #213529 → #14211a); statt des Lichtflecks der **Klangring** (Variante B, js/klangring.js):
+    feine Kreislinie in der Phasenfarbe, verformt sich mit der Stimme (tief unten, hoch oben, lauter stärker), atmet in
+    der Stille wie bisher. Messpunkt `voiceAnalyser` an der Stimme (js/stimme.js), je Lage eigener Grundpegel (an
+    „Helmut“ gemessen); zeichnet nur, solange gesprochen wird (~0,08 ms je Bild); bei „Bewegung reduzieren“ der alte Kreis.
+  - **Kraftort-Auswahl für Gäste (Wahl des Inhabers, Variante C, 8. Oktober 2026):** Antippen der Phase Kraftort klappt
+    die Orte als Knöpfe darunter auf (vorher verdeckt); Orte = im Admin-Bereich aktive Kraftort-Gruppen mit aktiven
+    Sprüchen. Standard „Zufällig“ (wählt beim Starten einen Ort); ist nur ein Ort aktiv, steht nur dieser da, ohne
+    „Zufällig“. **Abwählen über die Zahl** wie bei den anderen Phasen (Inhaber, 8. Oktober 2026; kein eigener Knopf):
+    die Zeile besteht aus zwei Knöpfen, Zahl (ab/an) und Name (Orte aufklappen). Nur im Speicher
+    (`state.kraftort`, `placeGroups()`, `placeSayings()` in js/zustand.js).
   - **Sätze nacheinander mit einstellbarer Sprechpause** (Inhaber, 6. Oktober 2026): zuerst 1,1 s, dann „etwas länger“,
     Standard jetzt 2,0 s, im Admin-Bereich unter „Einstellungen“ 0,5–10 s in Zehntelsekunden (`settings.pause` in
     config.js, geprüft in `cleanSettings` und im Helfer); ist der Text einer Phase durch, geht es von vorn los.
@@ -172,7 +186,12 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
   Schnitte passend zur Satzlänge; Test mit 190 Sätzen: 189/189 richtig) und legt die Rohaufnahmen ab; danach wie bei
   jeder Stimme vertonen. Fehlen Sätze (neue oder geänderte Sprüche), endet die Vertonung mit „… Sätze fehlen noch bei
   ElevenLabs“ und schreibt sie nach `hoerproben/elevenlabs-fehlend.txt` zum Hochladen; neu exportierte Fassungen
-  bekommen eine neue Variante. **Nennung (Wahl des Inhabers, Variante A, 8. Oktober 2026):** im Stimmhinweis unter dem
+  bekommen eine neue Variante. **Geänderte Sätze (Inhaber, 8. Oktober 2026):** Statuszeile „N Sätze fehlen bei
+  ElevenLabs“ mit Link „Text für ElevenLabs“ (`hoerproben/elevenlabs-auftraege/meditation-neu-<Zeit>.txt`) und Knopf
+  „Nach ElevenLabs-Downloads suchen“ (Wahl des Inhabers B, 8. Oktober 2026: nur Knopf, kein Wächter im Hintergrund):
+  übernimmt aus `~/Downloads` zuerst einen Export, dessen Name zur Textdatei passt, sonst den neuesten, wenn die Länge
+  passt; danach vertonen, „Veröffentlichen“ wartet bis dahin. Übernommene Exporte: `~/.local/share/meditation-app/elevenlabs-importiert.json`.
+  **Nennung (Wahl des Inhabers, Variante A, 8. Oktober 2026):** im Stimmhinweis unter dem
   Startkreis „Es liest „Helmut“ von elevenlabs.io“ (`VOICE_CREDITS` in js/stimme.js) und in datenschutz.html.
   Chatterbox „Karlsson ruhig“ und Piper bleiben als Ersatzstimmen eingerichtet.
 

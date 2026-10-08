@@ -17,7 +17,7 @@
 <link rel="preload" href="fonts/AtkinsonHyperlegible-Bold.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/InterZiffern-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/InterZiffern-Bold.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="app.css?v=46e9677b">
+<link rel="stylesheet" href="app.css?v=3360769a">
 </head>
 <body>
 <div class="wrap">
@@ -96,6 +96,7 @@
     </div>
     <div class="s-center">
       <div class="s-orb" aria-hidden="true"></div>
+      <canvas class="s-ring" id="sRing" aria-hidden="true"></canvas>
       <p class="s-line" id="sLine" aria-live="polite"></p>
     </div>
     <div class="s-bar" id="sBar" aria-hidden="true"></div>
@@ -127,6 +128,8 @@
         <span class="adm-rec-text" id="admRecText"></span>
         <button class="link" id="admRecBtn" hidden>Jetzt vertonen</button>
         <button class="link" id="admRecStop" hidden>Vertonung abbrechen</button>
+        <a class="link" id="admElText" hidden title="Diese Datei in ElevenLabs Studio hochladen und als eine MP3 exportieren, danach „Nach ElevenLabs-Downloads suchen“">Text für ElevenLabs</a>
+        <button class="link" id="admElSearch" hidden title="Sucht im Download-Ordner nach dem Export aus ElevenLabs Studio und übernimmt ihn">Nach ElevenLabs-Downloads suchen</button>
       </div>
       <button class="btn sm primary" id="publishBtn">Veröffentlichen</button>
       <button class="btn sm" id="admClose">Fertig</button>
@@ -189,14 +192,15 @@
 <script src="js/phasen.js?v=4a1758aa"></script>
 <script src="js/texte.js?v=fa937935"></script>
 <script src="config.js?v=ca4a34b3"></script>
-<script src="js/zustand.js?v=d74f7eff"></script>
+<script src="js/zustand.js?v=010f5d0c"></script>
 <script src="js/aufnahmen.js?v=3f983334"></script>
-<script src="js/stimme.js?v=0ce11e53"></script>
+<script src="js/stimme.js?v=0b24a166"></script>
 <script src="js/meldungen.js?v=7c55a041"></script>
-<script src="js/plan.js?v=727a6b85"></script>
-<script src="js/sitzung.js?v=c5b848a1"></script>
-<script src="js/bedienung.js?v=7a5092f0"></script>
-<script src="js/admin.js?v=5ab2ea2a"></script>
+<script src="js/plan.js?v=c6d5388a"></script>
+<script src="js/sitzung.js?v=15b16757"></script>
+<script src="js/klangring.js?v=0b302aff"></script>
+<script src="js/bedienung.js?v=446d21f7"></script>
+<script src="js/admin.js?v=f0295103"></script>
 <script src="js/start.js?v=bf25bd92"></script>
 </body>
 </html>

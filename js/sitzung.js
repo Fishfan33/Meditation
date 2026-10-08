@@ -15,7 +15,7 @@ const PHASE_LEAD = 1.5;            // kurze Pause beim Übergang in die nächste
 // gesprochen, auch wenn er etwas darüber hinausgeht; danach kommt keiner mehr (Inhaber, Oktober 2026).
 // Zufall: wird festgelegt, wenn die Texte fertig sind (Inhaber); bis dahin gilt die Standard-Reihenfolge.
 function phaseLines(i, avail) {
-  const pool = activeSayings(PHASES[i].id);
+  const pool = PHASES[i].id === "kraftort" ? placeSayings() : activeSayings(PHASES[i].id);   // Kraftort: gewählter Ort
   const lines = [];
   for (let k = 0, used = 0; pool.length && used < avail; k++) {
     const l = pool[k % pool.length];
@@ -55,6 +55,7 @@ function buildSession() {
 // Die Zeit kommt immer aus der Uhr (performance.now), nie aus mitgezählten Takten: Browser bremsen Zeitgeber,
 // wenn die Seite im Hintergrund ist. Verpasste Sätze werden dann nur angezeigt, nicht nachgeholt.
 let session = null;
+let ringPhase = -1;   // zuletzt gezeichnete Phase (für die Farbe des Klangrings)
 let wakeLock = null;
 const sessionDlg = document.getElementById("session");
 const $s = id => document.getElementById(id);
@@ -84,6 +85,8 @@ function startSession() {
   sessionDlg.classList.remove("paused", "done");
   setPauseButton(false);
   sessionDlg.showModal();
+  ringPhase = -1;
+  window.klangringWecken?.();   // ruhiger Ring von Anfang an (js/klangring.js)
   if (state.sound !== "aus" && ambience?.id !== state.sound) startAmbience(state.sound);
   $s("sPause").focus();
   keepAwake();
@@ -127,6 +130,7 @@ function paint(t) {
   const no = phaseNo(ph.i);
   $s("sPhase").textContent = `${no} ${PHASES[ph.i].name}`;
   sessionDlg.style.setProperty("--ct", `var(--p${ph.i + 1}-dark)`);
+  if (ph.i !== ringPhase) { ringPhase = ph.i; window.klangringWecken?.(); }   // neue Phasenfarbe für den Ring
   $s("sLeft").textContent = `noch ${clockText(session.total - t)}`;
   sessionDlg.querySelectorAll(".s-fill").forEach((f, k) => {
     const p = session.phases[k];

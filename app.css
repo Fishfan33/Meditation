@@ -174,6 +174,22 @@ header h1 { margin: 0; font-size: 21px; line-height: 1.2; }
 .chip.off { background: transparent; border: 1.5px dashed color-mix(in srgb, var(--muted) 55%, transparent); color: var(--muted); }
 .chip.off .chip-no { background: transparent; border: 1.5px dashed color-mix(in srgb, var(--muted) 55%, transparent); }
 .chip.off .chip-name { font-weight: 400; }
+/* Kraftort-Auswahl (Variante C): Orte als Knöpfe unter der Phase, erst nach Antippen sichtbar */
+.chip-place { font-weight: 400; color: var(--muted); }
+.places { display: flex; flex-wrap: wrap; gap: 8px; margin: -2px 0 4px 40px; }
+.place {
+  min-height: 44px; padding: 6px 16px; border-radius: 22px; border: 1.5px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  background: var(--surface); color: var(--text); font: inherit; font-size: 15px; cursor: pointer;
+}
+.place.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent, #fff); font-weight: 700; font-synthesis: none; }
+/* Kraftort-Zeile aus zwei Knöpfen: Zahl (ab- und anwählen) und Name (Orte aufklappen), sieht aus wie die anderen */
+.chip-split { cursor: default; padding: 0; grid-template-columns: 50px minmax(0, 1fr); gap: 0; }
+.chip-split .chip-no-btn { width: 44px; height: 44px; margin-left: 6px; border: 0; background-clip: content-box; padding: 8px;
+  color: inherit; font: inherit; font-size: 14px; font-weight: 700; font-synthesis: none; cursor: pointer; }
+.chip-split.off .chip-no-btn { border: 0; background: transparent; outline: 1.5px dashed color-mix(in srgb, var(--muted) 55%, transparent);
+  outline-offset: -9px; }
+.chip-main { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 52px;
+  padding: 8px 14px 8px 4px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 
 /* ---------- Unten: Zeiten der Phasen zum Aufklappen ---------- */
 .fold { margin-top: 22px; border-top: 1px solid var(--border); }
@@ -211,12 +227,13 @@ footer a { color: var(--accent); }
 /* ---------- Laufende Meditation ----------
    Ganzer Bildschirm, immer dunkel und ruhig. Der Kreis atmet langsam (etwa 6 Atemzüge pro Minute). */
 dialog.session {
-  --s-text: #ece9e2; --s-muted: #a9adbb; --ct: var(--p1-dark);
+  --s-text: #ece9e2; --s-muted: #a9b8ad; --ct: var(--p1-dark);
   width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: 0; border: 0;
-  background: radial-gradient(120% 90% at 50% 40%, #1d2233 0%, #141826 55%, #0d0f16 100%);
+  /* Tannengrün wie im App-Symbol (Wahl des Inhabers, Variante C, Oktober 2026) */
+  background: radial-gradient(120% 90% at 50% 40%, #2f4a3a 0%, #213529 55%, #14211a 100%);
   color: var(--s-text);
 }
-dialog.session::backdrop { background: #0d0f16; }
+dialog.session::backdrop { background: #14211a; }
 .s-wrap {
   height: 100%; display: flex; flex-direction: column; align-items: center;
   padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom));
@@ -232,7 +249,7 @@ dialog.session::backdrop { background: #0d0f16; }
 .session .sound-wrap { position: relative; }
 .session .sound-btn { background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .22); color: var(--s-text); }
 .session .sound-btn.on { background: rgba(255, 255, 255, .16); color: var(--s-text); border-color: rgba(255, 255, 255, .4); }
-.session .sound-menu { background: #1f2436; border-color: rgba(255, 255, 255, .14); box-shadow: 0 10px 28px rgba(0, 0, 0, .4); }
+.session .sound-menu { background: #22382c; border-color: rgba(255, 255, 255, .14); box-shadow: 0 10px 28px rgba(0, 0, 0, .4); }
 .session .sound-menu button { color: var(--s-text); }
 .session .sound-menu button:hover { background: rgba(255, 255, 255, .08); }
 .session .sound-menu button[aria-checked="true"] { color: #e8c9a0; }
@@ -245,6 +262,11 @@ dialog.session::backdrop { background: #0d0f16; }
   animation: breathe 10s ease-in-out infinite; transition: background 1.5s;
 }
 @keyframes breathe { 0%, 100% { transform: scale(.82); } 50% { transform: scale(1); } }
+/* Klangring (Variante B des Inhabers): ersetzt den Lichtfleck, atmet wie er; bei „Bewegung reduzieren“ bleibt .s-orb */
+.s-ring { position: absolute; width: min(62vw, 340px); aspect-ratio: 1; display: none; animation: breathe 10s ease-in-out infinite; }
+dialog.session.has-ring .s-ring { display: block; }
+dialog.session.has-ring .s-orb { display: none; }
+dialog.session.paused .s-ring { animation-play-state: paused; }
 dialog.session.paused .s-orb { animation-play-state: paused; }
 .s-line {
   position: relative; max-width: 26ch; margin: 0; text-align: center;
