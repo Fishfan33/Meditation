@@ -91,6 +91,11 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
   - **Kein Gong** (Inhaber, 7. Oktober 2026: ersatzlos gestrichen, vorher eine Klangschale zu Beginn). Die Meditation
     beginnt nach 2 Sekunden Ruhe mit dem ersten Satz.
   - Phasen bleiben immer in derselben Reihenfolge.
+  - **Meditations-Ansicht (Wahl des Inhabers, 8. Oktober 2026):** Hintergrund **Tannengrün** wie im App-Symbol
+    (Variante C: #2f4a3a → #213529 → #14211a); statt des Lichtflecks der **Klangring** (Variante B, js/klangring.js):
+    feine Kreislinie in der Phasenfarbe, verformt sich mit der Stimme (tief unten, hoch oben, lauter stärker), atmet in
+    der Stille wie bisher. Messpunkt `voiceAnalyser` an der Stimme (js/stimme.js), je Lage eigener Grundpegel (an
+    „Helmut“ gemessen); zeichnet nur, solange gesprochen wird (~0,08 ms je Bild); bei „Bewegung reduzieren“ der alte Kreis.
   - **Kraftort-Auswahl für Gäste (Wahl des Inhabers, Variante C, 8. Oktober 2026):** Antippen der Phase Kraftort klappt
     die Orte als Knöpfe darunter auf (vorher verdeckt); Orte = im Admin-Bereich aktive Kraftort-Gruppen mit aktiven
     Sprüchen. Standard „Zufällig“ (wählt beim Starten einen Ort); ist nur ein Ort aktiv, steht nur dieser da, ohne
