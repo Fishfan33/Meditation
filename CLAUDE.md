@@ -164,6 +164,18 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
 
 ## Stimmen (Stand 7. Oktober 2026)
 
+- **Wahl des Inhabers (8. Oktober 2026): ElevenLabs „Helmut – warm, gentle and soothing“** (`elevenlabs`/`helmut`),
+  nach Hörprobe mit dem Kraftort „Bergsee“ (`hoerproben/elevenlabs-bergsee/`). Import-Programm (`"import": true` in
+  stimmen.json): spricht nicht selbst. Ablauf: alle Sätze als ein Dokument (`hoerproben/elevenlabs-alle/
+  meditation-alle-saetze.txt`, ein Satz je Absatz) in ElevenLabs Studio hochladen, als eine MP3 exportieren,
+  `python3 werkzeuge/elevenlabs_import.py <export.mp3> <texte.txt>` teilt sie an den Satzpausen (`werkzeuge/teilen.py`,
+  Schnitte passend zur Satzlänge; Test mit 190 Sätzen: 189/189 richtig) und legt die Rohaufnahmen ab; danach wie bei
+  jeder Stimme vertonen. Fehlen Sätze (neue oder geänderte Sprüche), endet die Vertonung mit „… Sätze fehlen noch bei
+  ElevenLabs“ und schreibt sie nach `hoerproben/elevenlabs-fehlend.txt` zum Hochladen; neu exportierte Fassungen
+  bekommen eine neue Variante. **Nennung (Wahl des Inhabers, Variante A, 8. Oktober 2026):** im Stimmhinweis unter dem
+  Startkreis „Es liest „Helmut“ von elevenlabs.io“ (`VOICE_CREDITS` in js/stimme.js) und in datenschutz.html.
+  Chatterbox „Karlsson ruhig“ und Piper bleiben als Ersatzstimmen eingerichtet.
+
 - **Wahl des Inhabers (7. Oktober 2026): Chatterbox mit Vorlage „Karlsson“** (`chatterbox`/`karlsson`), Tempo 100 %.
   **Vertonung erst nach ausdrücklicher Zustimmung des Inhabers starten** (dauert etwa 3 Stunden; Umstellen der Stimme über
   `/api/speichern` startet sie sofort). Bis dahin bleibt Piper Thorsten (A2) aktiv. `datenschutz.html` und

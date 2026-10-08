@@ -201,6 +201,7 @@ header h1 { margin: 0; font-size: 21px; line-height: 1.2; }
 .fold-hint { margin: 8px 0 0; color: var(--muted); font-size: 13px; }
 
 .voice-note { color: var(--muted); font-size: 13px; margin: 20px 0 0; }
+.voice-note a { color: var(--accent); }
 footer {
   display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px;
   margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--border); color: var(--muted); font-size: 13px;

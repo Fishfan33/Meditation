@@ -78,9 +78,10 @@ WACH_BLEIBEN = True   # während einer Vertonung keinen Ruhezustand (systemd-inh
 
 
 def stimmen_katalog():
-    """Programme und Stimmen aus werkzeuge/stimmen.json; „eingerichtet“, wenn die Python-Umgebung des Programms da ist."""
+    """Programme und Stimmen aus werkzeuge/stimmen.json; „eingerichtet“, wenn die Python-Umgebung des Programms da ist.
+    Import-Programme (ElevenLabs: Aufnahmen kommen als Studio-Export) sind immer eingerichtet."""
     daten = json.loads(STIMMEN.read_text(encoding="utf-8"))
-    return {k: {**v, "eingerichtet": (DATEN / v["ordner"] / "venv" / "bin" / "python").exists()}
+    return {k: {**v, "eingerichtet": bool(v.get("import")) or (DATEN / v["ordner"] / "venv" / "bin" / "python").exists()}
             for k, v in daten.items() if not k.startswith("_")}
 
 

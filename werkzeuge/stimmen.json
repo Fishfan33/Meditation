@@ -12,6 +12,15 @@
    "mls-3503": {"name": "Sprecher 3503", "modell": "de_DE-mls-medium", "sprecher": "3503", "length_scale": 1.15, "probe": "piper-5-mls-3503.mp3"}
   }
  },
+ "elevenlabs": {
+  "name": "ElevenLabs",
+  "import": true,
+  "sekunden_je_satz": 0,
+  "_hinweis": "Spricht nicht selbst: Studio-Export (eine MP3) mit werkzeuge/elevenlabs_import.py übernehmen. Nennung „elevenlabs.io“ im Stimmhinweis (js/stimme.js).",
+  "stimmen": {
+   "helmut": {"name": "Helmut", "probe": "elevenlabs-helmut.mp3"}
+  }
+ },
  "chatterbox": {
   "name": "Chatterbox",
   "ordner": "meditation-chatterbox",

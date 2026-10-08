@@ -169,14 +169,24 @@ function stopAmbience(fadeOut = 3) {
 }
 
 // Hinweis unten auf der Startseite: welche Stimme gerade vorliest
+// Nennung der Stimme im Hinweis (Wahl des Inhabers, Variante A, Oktober 2026), je nach gewählter Stimme aus config.js
+const VOICE_CREDITS = { "elevenlabs/helmut": { name: "Helmut", by: "elevenlabs.io", url: "https://elevenlabs.io" } };
 function updateVoiceNote() {
   const el = document.getElementById("voiceNote");
   if (!el) return;
   const all = PHASES.flatMap(p => spokenSayings(p.id));
   const missing = all.filter(s => !recordingOf(s.text)).length;
-  // Ohne Namen der Stimme: Welche gilt, wählt der Inhaber im Admin-Bereich (Chatterbox „Karlsson“, Piper „Thorsten“ …)
+  const credit = VOICE_CREDITS[`${settings.stimme?.programm}/${settings.stimme?.stimme}`];
+  const rest = missing ? `; ${missing === 1 ? "ein Spruch ist" : `${missing} Sprüche sind`} noch nicht vertont und kommen von der Stimme des Browsers.`
+    : ", auch ohne Internet.";
+  if (credit && missing < all.length) {
+    const a = document.createElement("a");
+    a.href = credit.url; a.textContent = credit.by; a.rel = "noopener";
+    el.replaceChildren(`Es liest „${credit.name}“ von `, a, rest);
+    return;
+  }
   el.textContent = missing === 0 ? "Vorgelesen aus Aufnahmen, auch ohne Internet."
-    : missing < all.length ? `Vorgelesen aus Aufnahmen; ${missing === 1 ? "ein Spruch ist" : `${missing} Sprüche sind`} noch nicht vertont und kommen von der Stimme des Browsers.`
+    : missing < all.length ? `Vorgelesen aus Aufnahmen${rest}`
     : !synth ? "Dieser Browser kann nicht vorlesen. Die Texte erscheinen während der Meditation auf dem Bildschirm."
     : chosenVoice ? `Vorläufig liest die Stimme des Browsers vor: ${chosenVoice.name}.`
     : "Vorläufig liest die Stimme des Browsers vor.";

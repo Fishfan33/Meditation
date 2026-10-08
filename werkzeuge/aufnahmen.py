@@ -112,7 +112,8 @@ ABKUERZUNGEN = ("z.", "d.", "u.", "bzw.", "ca.", "Nr.", "vgl.", "usw.", "etc.", 
 def saetze(text):
     teile = []
     for t in SATZENDE.split(text):
-        if teile and teile[-1].endswith(ABKUERZUNGEN):
+        # Ganzes letztes Wort vergleichen, nicht nur die Endung: sonst gälten „Sand.“ oder „sind.“ als „d.“ (Fehler, Oktober 2026)
+        if teile and teile[-1].split()[-1] in ABKUERZUNGEN:
             teile[-1] += " " + t
         else:
             teile.append(t)
@@ -360,6 +361,11 @@ def main():
 
     todo = [z for z in reihenfolge(eintraege) if not stimme.mp3(z).exists()]
     sprechen = offen()
+    # Import-Programm (ElevenLabs): spricht nicht selbst. Was fehlt, kommt in eine Datei zum Hochladen in Studio;
+    # alles andere wird ganz normal umgewandelt und in die Liste übernommen.
+    import_fehlt = []
+    if katalog()[stimme.programm].get("import"):
+        import_fehlt, sprechen = sprechen, []
     print(f"GESAMT {len(todo)}", flush=True)
     print(f"SPRECHEN {len(sprechen)}", flush=True)
     sprecher, gesprochen = None, 0
@@ -381,6 +387,8 @@ def main():
     if sprecher:
         sprecher.ende()
     alle_saetze = reihenfolge(eintraege)
+    if import_fehlt:   # nur, was es als Aufnahme gibt
+        alle_saetze = [z for z in alle_saetze if stimme.roh(z).exists() or stimme.mp3(z).exists()]
     todo = [z for z in alle_saetze if not stimme.mp3(z).exists()]
     if todo:
         print("PHASE umwandeln", flush=True)
@@ -403,7 +411,7 @@ def main():
             print(f"LISTE {i}/{len(neu)}", flush=True)
     # Je Spruch die Sätze in Reihenfolge: [[Datei, Sekunden], …]
     texts = [t for t, _ in eintraege]
-    rec = {t: [[name(z), bekannt[name(z)]] for z in saetze(t)] for t in texts}
+    rec = {t: [[name(z), bekannt[name(z)]] for z in saetze(t)] for t in texts if all(name(z) in bekannt for z in saetze(t))}
     # Erst in eine Nachbardatei, dann austauschen: Die App liest nie eine halb geschriebene Liste
     ziel = ROOT / "js/aufnahmen.js"
     tmp = ziel.with_suffix(".tmp")
@@ -425,6 +433,12 @@ def main():
     print(f"{stimme.titel}, Tempo {stimme.tempo:.2f}: {len(texts)} Sprüche, {len(alle_saetze)} Sätze, "
           f"{gesprochen} neu gesprochen, {len(todo)} umgewandelt, zusammen {size / 1e6:.1f} MB")
     print("ENDE", flush=True)
+    if import_fehlt:
+        datei = ROOT / f"hoerproben/{stimme.programm}-fehlend.txt"
+        datei.parent.mkdir(exist_ok=True)
+        datei.write_text("\n\n".join(import_fehlt) + "\n", encoding="utf-8")
+        sys.exit(f"{len(import_fehlt)} Sätze fehlen noch bei {katalog()[stimme.programm]['name']}. "
+                 f"Zum Hochladen in Studio: {datei.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":

@@ -31,6 +31,7 @@ THREADS = int(os.environ.get("MEDITATION_THREADS") or max(1, (os.cpu_count() or 
 PARAMETER = {
     "piper": {"v": 1, "satzpause": 0.7},
     "chatterbox": {"v": 1, "exaggeration": 0.4, "cfg_weight": 0.3, "temperature": 0.7},
+    "elevenlabs": {"v": 1},   # spricht nicht selbst: Aufnahmen kommen über werkzeuge/elevenlabs_import.py
 }
 
 
