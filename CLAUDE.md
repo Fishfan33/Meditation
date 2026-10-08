@@ -37,7 +37,8 @@ Reines HTML/CSS/JS wie im Retro-Cockpit. Klassische Skripte in `js/`, Reihenfolg
   nichts Neues (auch nicht nach Speichern oder Neustart, gemerkt in `~/.local/share/meditation-app/vertonung-angehalten`),
   bis „Fortsetzen“. **Je Spruch die Stimme der gültigen Aufnahme** (Inhaber): „· Piper · Thorsten, 7. Okt., 14:32“ unter
   dem Text, aus den Dateinamen erkannt (`aufnahmen.herkunft()`, `/api/herkunft`).
-  „Frühere Stände“ unter „Einstellungen“.
+  „Frühere Stände“ unter „Einstellungen“. Knopf **„Fertig“** schließt den Admin-Bereich (alles ist schon gespeichert);
+  der Name bleibt (Inhaber, 8. Oktober 2026).
   **Schutz vor Überschreiben:** Speichern schickt den Fingerabdruck (`configStand`, SHA-256 von config.js) mit; hat sich
   config.js inzwischen geändert, lehnt der Helfer ab („KONFLIKT“), die Seite zeigt rot „Seite neu laden“. Claude ändert
   Sprüche nur über `/api/speichern` mit aktuellem Fingerabdruck (Sicherung und Vertonung inklusive), nie direkt in der Datei.

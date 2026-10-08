@@ -63,7 +63,10 @@ function ringTick() {
   for (const k in ringLevel) ringLevel[k] += (b[k] - ringLevel[k]) * .14;   // weich nachgeführt, ruhig
   ringDraw();
   ringStill = ringLevel.v < .01 && b.v === 0 ? ringStill + 1 : 0;
-  if (ringStill < 45) ringFrame = requestAnimationFrame(ringTick);   // nach ~0,75 s Stille: Ring steht, nichts rechnet
+  // Wach bleiben, solange noch Sätze des Spruchs eingeplant sind oder klingen (die Sätze liegen mit der Sprechpause
+  // dazwischen auf der Zeitachse; vorher schlief der Ring in der Pause ein und verpasste den zweiten Satz).
+  // Erst wenn nichts mehr kommt und es ~0,75 s still ist, ruht er.
+  if (voiceSources.length || ringStill < 45) ringFrame = requestAnimationFrame(ringTick);
 }
 // Aufwecken: beim Sprechen (js/stimme.js), beim Öffnen der Ansicht und wenn sich die Phasenfarbe ändert
 window.klangringWecken = () => {
