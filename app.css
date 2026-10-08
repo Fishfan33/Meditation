@@ -534,3 +534,25 @@ dialog.confirm p { margin: 10px 0 16px; }
 .legal a { color: var(--accent); }
 .legal .lead { font-size: 18px; }
 .legal .muted { color: var(--muted); font-size: 14px; margin-top: 24px; }
+
+/* Reiter „Veröffentlichen“ (Variante B des Inhabers): Fortschritt, nächster Schritt, geänderte Sprüche */
+.flow-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0 8px; font-size: 14px; }
+.flow-chip { padding: 4px 12px; border-radius: 14px; background: color-mix(in srgb, var(--muted) 14%, transparent); color: var(--muted); }
+.flow-chip.done { background: color-mix(in srgb, #4a7546 18%, transparent); color: var(--text); }
+.flow-chip.now { background: var(--accent); color: var(--on-accent); font-weight: 700; font-synthesis: none; }
+.flow-sep { color: var(--muted); }
+.flow-bar { height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--accent) 16%, transparent); overflow: hidden; margin-bottom: 14px; }
+.flow-bar i { display: block; height: 100%; background: var(--accent); transition: width .4s; }
+.flow-next { padding: 12px 14px; border-radius: 12px; background: var(--accent-soft); margin-bottom: 8px; }
+.flow-next .adm-set-title { margin-top: 0; }
+.flow-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.flow-acts a.btn { text-decoration: none; display: inline-flex; align-items: center; }
+.flow-howto { margin: 6px 0 0; padding-left: 1.3em; line-height: 1.5; }
+.flow-done { margin: 0; font-weight: 700; font-synthesis: none; color: #4a7546; }
+.flow-ok { color: #4a7546; font-size: 13px; }
+.flow-all { margin: 10px 0; }
+.flow-all summary { cursor: pointer; color: var(--accent); }
+.flow-notes { width: 100%; box-sizing: border-box; font: inherit; font-size: 15px; padding: 8px 10px; border: 1px solid var(--border);
+  border-radius: 10px; background: var(--surface); color: var(--text); resize: vertical; }
+@media (prefers-color-scheme: dark) { .flow-done, .flow-ok { color: #9fcf8f; } }
+.flow-list .adm-row { grid-template-columns: 40px minmax(0, 1fr) auto; }

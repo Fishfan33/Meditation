@@ -202,9 +202,10 @@ function paintStatus() {
   document.getElementById("admRecStop").hidden = !recBusy();
   // ElevenLabs (Import-Stimme): fehlende Sätze als Text zum Herunterladen; den Export übernimmt der Knopf daneben
   const el = recState.elevenlabs || {}, elLink = document.getElementById("admElText");
-  elLink.hidden = recBusy() || !el.text || !el.fehlt;
+  elLink.hidden = true;   // Text, Ordner und Suchen stehen jetzt im Reiter „Veröffentlichen“ (Wahl des Inhabers)
   if (el.text) { elLink.href = el.text; elLink.download = el.text.split("/").pop(); }
-  document.getElementById("admElSearch").hidden = elLink.hidden;
+  document.getElementById("admElSearch").hidden = true;
+  document.getElementById("admToFlow").hidden = !el.fehlt || admTab === "veroeff";
   text.title = "";
   if (recState.laeuft) {
     const p = Math.max(0, Math.min(100, recState.prozent || 0));
@@ -258,6 +259,10 @@ async function refreshStatus() {
   elSeen = elMeldung;
   // Veröffentlichen, das in dieser Sitzung angestoßen wurde: Ergebnis melden
   const pub = recState.veroeffentlichen || {};
+  if (["wartet", "laeuft"].includes(pubSeen) && pub.zustand === "fertig" && pub.aenderungen?.length) {
+    flowOnline = { pruefen: true, online: false, seit: 0, bis: Date.now() + 15 * 60000 };
+    flowTimer = setTimeout(checkOnline, 20000);
+  }
   if (["wartet", "laeuft"].includes(pubSeen) && pub.zustand === "fertig") {
     showToast(pub.aenderungen?.length ? `✓ Veröffentlicht (Stand ${pub.stand}). Online in 1 bis 10 Minuten; auf dem iPhone ` +
       "erscheint dann „Neue Version verfügbar“." : "Alles war schon veröffentlicht.", null, { long: true });
@@ -265,6 +270,12 @@ async function refreshStatus() {
   if (["wartet", "laeuft"].includes(pubSeen) && pub.zustand === "fehler") showAlert(pub.meldung);
   pubSeen = pub.zustand;
   paintStatus();
+  renderAdminTabs();   // Zahl am Reiter „Veröffentlichen“
+  if (adminDlg.open && admTab === "veroeff") {
+    // Hat sich etwas geändert (gespeichert, übernommen, veröffentlicht), die Liste neu holen; sonst nur neu zeichnen
+    const key = `${recState.offen}|${recState.stand}|${recState.elevenlabs?.fehlt}|${pub.zustand}`;
+    if (key !== flowKey) { flowKey = key; loadFlow(); } else paintFlow();
+  }
   if (adminDlg.open && (recBusy() || pubBusy())) recTimer = setTimeout(refreshStatus, recState.laeuft ? 500 : 1000);
   else if (adminDlg.open && recState.elevenlabs?.fehlt) recTimer = setTimeout(refreshStatus, 5000);   // wartet auf den Export
 }
@@ -338,13 +349,15 @@ const fmtDur = sec => { const s = Math.round(sec); return s < 60 ? `${s} Sek` : 
 // ---------- Darstellung ----------
 function renderAdmin() {
   renderAdminTabs();
-  admPanel.innerHTML = admTab === "klang" ? soundsMarkup() : admTab === "einst" ? settingsMarkup() : phaseMarkup(admTab);
+  admPanel.innerHTML = admTab === "klang" ? soundsMarkup() : admTab === "einst" ? settingsMarkup()
+    : admTab === "veroeff" ? flowMarkup() : phaseMarkup(admTab);
   if (admEditing) admPanel.querySelector(".adm-edit textarea")?.focus();
   if (admRenaming) { const f = admPanel.querySelector(".adm-rename input"); f?.focus(); f?.select(); }
 }
 function renderAdminTabs() {
   const tabs = [...PHASES.map((p, i) => ({ id: p.id, label: p.name, no: i + 1, count: spokenSayings(p.id).length })),
     { id: "klang", label: "Klänge", no: "♪", count: SOUNDS.filter(s => s.id !== "aus" && soundsOn[s.id]).length },
+    { id: "veroeff", label: "Veröffentlichen", no: "↑", count: recState.offen || "" },
     { id: "einst", label: "Einstellungen", no: "⚙", count: "" }];
   document.getElementById("admTabs").innerHTML = tabs.map(t =>
     `<button role="tab" class="adm-tab" data-tab="${t.id}" aria-selected="${t.id === admTab}" style="--ph:var(--p${t.no}, var(--accent-soft))">
@@ -625,6 +638,154 @@ admPanel.addEventListener("click", e => {
   }
 });
 
+// ---------- Reiter „Veröffentlichen“ ----------
+// Wahl des Inhabers (Variante B, Oktober 2026): eine Stelle für alles, was noch nicht online ist. Oben der Fortschritt
+// über den ganzen Ablauf (Geändert › ElevenLabs › Übernehmen › Anhören › Online), darunter immer nur der nächste
+// Schritt mit seinen Knöpfen, die geänderten Sprüche mit ▶ und eine kurze Anleitung. Anhören ist freiwillig (zählt
+// nur mit). Merkzettel für die ElevenLabs-Einstellungen liegt nur auf diesem Rechner. Läuft ohne Claude.
+const STUDIO_URL = "https://elevenlabs.io/app/studio";
+let flowInfo = null, flowNotes = null, flowOnline = { pruefen: false, online: false, seit: 0, bis: 0 };
+const flowHeard = new Set();
+let flowTimer = null, flowKey = "", flowText = "";
+async function loadFlow() {
+  try {
+    const [a, m] = await Promise.all([recCall("api/aenderungen"), flowNotes === null ? recCall("api/merkzettel") : null]);
+    flowInfo = a.ok ? a : { fehler: a.fehler, saetze: [], aenderungen: [] };
+    if (m?.ok) flowNotes = m.text;
+    // Text für ElevenLabs schon vorab holen: Kopieren muss direkt beim Klick geschehen (sonst lehnt der Browser ab)
+    const pfad = recState.elevenlabs?.text;
+    flowText = pfad ? (await fetch(`${pfad}?t=${Date.now()}`, { cache: "no-store" }).then(r => r.text())).trim() : "";
+  } catch { flowInfo = { fehler: "Der Admin-Helfer antwortet nicht.", saetze: [], aenderungen: [] }; }
+  if (adminDlg.open && admTab === "veroeff") paintFlow();
+}
+// Schritte und ihr Stand: done, now (gerade dran) oder todo
+function flowSteps() {
+  const el = recState.elevenlabs || {}, pub = recState.veroeffentlichen?.zustand;
+  const saetze = flowInfo?.saetze || [], offen = recState.offen || 0;
+  const allesOnline = !offen && !recBusy() && !el.fehlt && !pubBusy();
+  const gehoert = saetze.filter(s => flowHeard.has(s.text)).length;
+  const s = [
+    { id: "geaendert", name: "Geändert", done: offen > 0 || allesOnline },
+    { id: "eleven", name: "ElevenLabs", done: !el.fehlt },
+    { id: "uebernehmen", name: "Übernehmen", done: !el.fehlt && !recBusy() },
+    { id: "anhoeren", name: "Anhören", done: !saetze.length || gehoert === saetze.length, frei: true, info: saetze.length ? `${gehoert}/${saetze.length}` : "" },
+    { id: "online", name: "Online", done: allesOnline && (!flowOnline.pruefen || flowOnline.online) },
+  ];
+  const jetzt = s.find(x => !x.done && !x.frei) || s.find(x => !x.done);
+  s.forEach(x => { x.now = x === jetzt; });
+  return s;
+}
+function flowNext(steps) {
+  const el = recState.elevenlabs || {}, now = steps.find(x => x.now), pub = recState.veroeffentlichen?.zustand;
+  if (!now) {
+    return flowOnline.online ? `<p class="flow-done">✓ Alles online (seit ${new Date(flowOnline.seit).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}).</p>`
+      : `<p class="flow-done">✓ Alles online. Es gibt nichts zu veröffentlichen.</p>`;
+  }
+  if (now.id === "eleven") return `<h3 class="adm-set-title">Jetzt: ${el.fehlt === 1 ? "einen Satz" : `${el.fehlt} Sätze`} bei ElevenLabs vertonen</h3>
+    <ol class="flow-howto"><li>Text kopieren (oder die Datei aus dem Ordner nehmen)</li><li>ElevenLabs Studio öffnen, Text einfügen bzw.
+      Datei hochladen, Einstellungen wie im Merkzettel, als <b>eine MP3</b> exportieren</li><li>Hier „Nach ElevenLabs-Downloads suchen“</li></ol>
+    <div class="flow-acts"><button class="btn sm" data-flow="kopieren">Text kopieren</button>
+      <button class="btn sm" data-flow="ordner">Ordner öffnen</button>
+      <a class="btn sm" href="${STUDIO_URL}" target="_blank" rel="noopener">ElevenLabs Studio öffnen ↗</a>
+      <button class="btn sm primary" data-flow="suchen">Nach ElevenLabs-Downloads suchen</button></div>`;
+  if (now.id === "uebernehmen") return `<h3 class="adm-set-title">Jetzt: Aufnahmen werden übernommen …</h3>
+    <p class="adm-hint">${esc(document.getElementById("admRecText").textContent)}</p>`;
+  if (now.id === "anhoeren") return `<h3 class="adm-set-title">Jetzt: geänderte Sprüche anhören (freiwillig), dann veröffentlichen</h3>
+    <p class="adm-hint">Mit ▶ in der Liste unten. Klingt ein Satz schief: Spruch bearbeiten und „Speichern“, dann fehlt er wieder bei ElevenLabs.</p>
+    <div class="flow-acts"><button class="btn sm primary" data-flow="veroeff">Veröffentlichen (${recState.offen || 0})</button></div>`;
+  if (pub === "wartet" || pub === "laeuft") return `<h3 class="adm-set-title">Jetzt: wird veröffentlicht …</h3>`;
+  if (flowOnline.pruefen) return `<h3 class="adm-set-title">Jetzt: GitHub stellt den neuen Stand online …</h3>
+    <p class="adm-hint">Das dauert 1 bis 10 Minuten; hier wird alle 20 Sekunden nachgesehen.</p>`;
+  const hoeren = steps.find(x => x.id === "anhoeren");
+  return `<h3 class="adm-set-title">Jetzt: ${hoeren.done ? "" : "anhören (freiwillig), dann "}veröffentlichen</h3>
+    ${hoeren.done ? "" : `<p class="adm-hint">Geänderte Sprüche mit ▶ in der Liste unten anhören. Klingt ein Satz schief: Spruch bearbeiten und
+      „Speichern“, dann fehlt er wieder bei ElevenLabs.</p>`}
+    <div class="flow-acts"><button class="btn sm primary" data-flow="veroeff">Veröffentlichen (${recState.offen || 0})</button></div>`;
+}
+function flowMarkup() {
+  setTimeout(() => { if (flowInfo) paintFlow(); loadFlow(); });   // gleich zeigen, was bekannt ist, dann frisch holen
+  return `<div id="flowBox">${flowInfo ? "" : '<p class="adm-hint">Lädt …</p>'}</div>`;
+}
+function paintFlow() {
+  const box = document.getElementById("flowBox");
+  if (!box) return;
+  if (document.activeElement?.id === "flowNotes") return;   // nicht beim Schreiben im Merkzettel neu zeichnen
+  const steps = flowSteps(), anteil = Math.round(100 * steps.filter(x => x.done).length / steps.length);
+  const saetze = flowInfo?.saetze || [];
+  const html = `<div class="flow-chips">${steps.map((x, k) => `${k ? '<span class="flow-sep" aria-hidden="true">›</span>' : ""}
+      <span class="flow-chip${x.done ? " done" : x.now ? " now" : ""}">${x.done ? "✓ " : ""}${x.name}${x.info ? ` ${x.info}` : ""}</span>`).join("")}</div>
+    <div class="flow-bar" role="progressbar" aria-label="Fortschritt bis online" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${anteil}"><i style="width:${anteil}%"></i></div>
+    <section class="flow-next">${flowNext(steps)}</section>
+    ${flowInfo?.fehler ? `<p class="adm-hint">${esc(flowInfo.fehler)}</p>` : ""}
+    <h3 class="adm-set-title">Geänderte Sprüche (${saetze.length})</h3>
+    ${saetze.length ? `<ul class="adm-list flow-list">${saetze.map(s => `<li class="adm-row">
+        <button class="adm-icon" data-flow-play="${esc(s.text)}" aria-label="Anhören" title="Anhören">▶</button>
+        <span class="adm-text">${esc(s.text)}<span class="adm-dur">${esc(s.phase)}${s.gruppe ? ` · ${esc(s.gruppe)}` : ""}</span></span>
+        <span class="adm-actions">${s.vertont ? `<span class="flow-ok">✓ vertont</span>` : `<span class="adm-norec">fehlt bei ElevenLabs</span>`}${flowHeard.has(s.text) ? ' <span class="flow-ok">· angehört</span>' : ""}</span></li>`).join("")}</ul>`
+      : `<p class="adm-hint">Keine neuen oder geänderten Sprüche.</p>`}
+    ${flowInfo?.aenderungen?.length ? `<details class="flow-all"><summary>Alle Änderungen, die noch nicht online sind (${flowInfo.aenderungen.length})</summary>
+      <ul class="pub-list">${flowInfo.aenderungen.map(z => `<li>${esc(z)}</li>`).join("")}</ul></details>` : ""}
+    <h3 class="adm-set-title">Merkzettel: deine Einstellungen bei ElevenLabs</h3>
+    <p class="adm-hint">Damit jeder neue Satz klingt wie die übrigen (Stimme, Modell, Stabilität, Tempo …). Bleibt nur auf diesem Rechner.</p>
+    <textarea id="flowNotes" class="flow-notes" rows="3" maxlength="1000" placeholder="z. B. Stimme Helmut · Modell … · Stabilität … · Tempo …">${esc(flowNotes || "")}</textarea>
+    <details class="flow-all"><summary>So geht's</summary><ol class="flow-howto">
+      <li>Sprüche in den Phasen-Reitern ändern und beim Spruch „Speichern“ (gerne mehrere hintereinander).</li>
+      <li>Hier „Text kopieren“ oder „Ordner öffnen“, in ElevenLabs Studio einfügen bzw. hochladen, mit den Einstellungen vom
+        Merkzettel vertonen und als eine MP3 exportieren.</li>
+      <li>„Nach ElevenLabs-Downloads suchen“: Die Sätze werden geteilt, eingeordnet und aufbereitet.</li>
+      <li>Geänderte Sprüche mit ▶ anhören (freiwillig).</li>
+      <li>„Veröffentlichen“: Nach 1 bis 10 Minuten ist der neue Stand online; Geräte bieten dann „Neu laden“ an.</li></ol></details>`;
+  // Nur neu zeichnen, wenn sich etwas geändert hat: sonst ginge ein Klick verloren, der genau dann landet
+  if (box.dataset.html === html) return;
+  const offen = [...box.querySelectorAll("details")].map(d => d.open);
+  box.innerHTML = html;
+  box.dataset.html = html;
+  box.querySelectorAll("details").forEach((d, k) => { d.open = !!offen[k]; });   // auf- und zugeklappt lassen
+}
+admPanel.addEventListener("click", async e => {
+  const play = e.target.closest("[data-flow-play]");
+  if (play) { stopGroup(); audioUnlock(); stopSpeaking(); speak(play.dataset.flowPlay); flowHeard.add(play.dataset.flowPlay); paintFlow(); return; }
+  const b = e.target.closest("[data-flow]");
+  if (!b) return;
+  const was = b.dataset.flow;
+  if (was === "veroeff") { document.getElementById("publishBtn").click(); return; }
+  if (was === "ordner") {
+    try { const r = await recCall("api/ordner-oeffnen"); if (!r.ok) throw new Error(r.fehler); showToast("Der Ordner ist in der Dateiverwaltung geöffnet."); }
+    catch (err) { showToast(`Ordner öffnen ging nicht: ${err.message || "Helfer antwortet nicht"}`, null, { danger: true }); }
+    return;
+  }
+  if (was === "kopieren") {
+    const fertig = () => showToast(`${recState.elevenlabs?.fehlt === 1 ? "Ein Satz" : `${recState.elevenlabs?.fehlt} Sätze`} kopiert. In ElevenLabs Studio einfügen.`);
+    const altWeg = () => {   // älterer Weg über ein unsichtbares Textfeld, geht auch, wo die Zwischenablage gesperrt ist
+      const t = document.createElement("textarea");
+      t.value = flowText; t.setAttribute("readonly", ""); t.style.position = "fixed"; t.style.opacity = "0";
+      adminDlg.append(t); t.select();
+      const ok = document.execCommand("copy"); t.remove(); return ok;
+    };
+    if (!flowText) { showToast("Kein Text vorhanden. Bitte die Datei aus dem Ordner nehmen.", null, { danger: true }); return; }
+    try { await navigator.clipboard.writeText(flowText); fertig(); }
+    catch { altWeg() ? fertig() : showToast("Kopieren ging nicht. Bitte die Datei aus dem Ordner nehmen.", null, { danger: true }); }
+    return;
+  }
+  if (was === "suchen") { document.getElementById("admElSearch").click(); return; }
+});
+admPanel.addEventListener("change", async e => {
+  if (e.target.id !== "flowNotes") return;
+  try { const r = await recCall("api/merkzettel", { text: e.target.value }); if (r.ok) { flowNotes = r.text; showToast("Merkzettel gespeichert."); } } catch {}
+});
+// Nach dem Veröffentlichen: alle 20 s nachsehen, ob GitHub Pages den neuen Stand ausliefert (höchstens 15 Minuten)
+async function checkOnline() {
+  clearTimeout(flowTimer);
+  if (!flowOnline.pruefen) return;
+  try {
+    const r = await recCall("api/online-pruefen");
+    if (r.online) { flowOnline = { pruefen: false, online: true, seit: Date.now(), bis: 0 }; showToast("✓ Der neue Stand ist online."); }
+  } catch {}
+  if (flowOnline.pruefen && Date.now() < flowOnline.bis) flowTimer = setTimeout(checkOnline, 20000);
+  else flowOnline.pruefen = false;
+  if (adminDlg.open && admTab === "veroeff") paintFlow();
+}
+
 // ---------- Öffnen und Schließen ----------
 const adminBtn = document.getElementById("adminBtn");
 adminBtn.hidden = !IS_ADMIN;
@@ -663,6 +824,11 @@ adminDlg.addEventListener("cancel", e => {
 });
 
 // ---------- Bedienung ----------
+// „Zum Ablauf ›“ in der Statuszeile: springt in den Reiter „Veröffentlichen“
+document.getElementById("admToFlow").addEventListener("click", () => {
+  admTab = "veroeff"; admEditing = admRenaming = null; renderAdmin(); paintStatus();
+  document.querySelector('[data-tab="veroeff"]')?.focus();
+});
 document.getElementById("admTabs").addEventListener("click", e => {
   const t = e.target.closest("[data-tab]");
   if (!t) return;

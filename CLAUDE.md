@@ -191,6 +191,14 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
   „Nach ElevenLabs-Downloads suchen“ (Wahl des Inhabers B, 8. Oktober 2026: nur Knopf, kein Wächter im Hintergrund):
   übernimmt aus `~/Downloads` zuerst einen Export, dessen Name zur Textdatei passt, sonst den neuesten, wenn die Länge
   passt; danach vertonen, „Veröffentlichen“ wartet bis dahin. Übernommene Exporte: `~/.local/share/meditation-app/elevenlabs-importiert.json`.
+  **Reiter „Veröffentlichen“ (Wahl des Inhabers, Variante B, 8. Oktober 2026), läuft ohne Claude:** Fortschritt über
+  Geändert › ElevenLabs › Übernehmen › Anhören › Online (kein iPhone-Schritt, dafür gibt es „Neu laden“), darunter nur
+  der nächste Schritt mit Knöpfen („Text kopieren“, „Ordner öffnen“ = `hoerproben/elevenlabs-auftraege/` per xdg-open,
+  „ElevenLabs Studio öffnen“ https://elevenlabs.io/app/studio, „Nach ElevenLabs-Downloads suchen“, „Veröffentlichen“),
+  die geänderten Sprüche mit ▶ (Anhören freiwillig, zählt nur mit), „Alle Änderungen“, Merkzettel der
+  ElevenLabs-Einstellungen (nur lokal, `~/.local/share/meditation-app/elevenlabs-merkzettel.txt`; Stimme Helmut, Modell
+  Eleven v4) und „So geht's“. Nach dem Veröffentlichen prüft er alle 20 s, ob GitHub Pages den Stand ausliefert
+  (`/api/online-pruefen`). Statuszeile: „N Sätze fehlen bei ElevenLabs · Zum Ablauf ›“.
   **Nennung (Wahl des Inhabers, Variante A, 8. Oktober 2026):** im Stimmhinweis unter dem
   Startkreis „Es liest „Helmut“ von elevenlabs.io“ (`VOICE_CREDITS` in js/stimme.js) und in datenschutz.html.
   Chatterbox „Karlsson ruhig“ und Piper bleiben als Ersatzstimmen eingerichtet.
