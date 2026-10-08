@@ -172,7 +172,12 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
   Schnitte passend zur Satzlänge; Test mit 190 Sätzen: 189/189 richtig) und legt die Rohaufnahmen ab; danach wie bei
   jeder Stimme vertonen. Fehlen Sätze (neue oder geänderte Sprüche), endet die Vertonung mit „… Sätze fehlen noch bei
   ElevenLabs“ und schreibt sie nach `hoerproben/elevenlabs-fehlend.txt` zum Hochladen; neu exportierte Fassungen
-  bekommen eine neue Variante. **Nennung (Wahl des Inhabers, Variante A, 8. Oktober 2026):** im Stimmhinweis unter dem
+  bekommen eine neue Variante. **Geänderte Sätze (Inhaber, 8. Oktober 2026):** Statuszeile „N Sätze fehlen bei
+  ElevenLabs“ mit Link „Text für ElevenLabs“ (`hoerproben/elevenlabs-auftraege/meditation-neu-<Zeit>.txt`) und Knopf
+  „Nach ElevenLabs-Downloads suchen“; ein Wächter im Helfer übernimmt Exporte aus `~/Downloads`, deren Name zur
+  Textdatei passt, von selbst (der Knopf auch andere, wenn die Länge passt); danach vertonen, „Veröffentlichen“ wartet
+  bis dahin. Übernommene Exporte: `~/.local/share/meditation-app/elevenlabs-importiert.json`.
+  **Nennung (Wahl des Inhabers, Variante A, 8. Oktober 2026):** im Stimmhinweis unter dem
   Startkreis „Es liest „Helmut“ von elevenlabs.io“ (`VOICE_CREDITS` in js/stimme.js) und in datenschutz.html.
   Chatterbox „Karlsson ruhig“ und Piper bleiben als Ersatzstimmen eingerichtet.
 

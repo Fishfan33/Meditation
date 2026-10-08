@@ -178,7 +178,7 @@ const originText = text => {
   const o = recordingOf(text) && recOrigin[text];
   return o ? ` · ${o.wer}${o.zeit ? `, ${fmtWhen(o.zeit)}` : ""}` : "";
 };
-let recTimer = null, recSeen = null, pubSeen = null;
+let recTimer = null, recSeen = null, pubSeen = null, elSeen = null;
 const recCall = (path, body = {}) => fetch(path, { method: "POST",
   headers: { "Content-Type": "application/json", "X-Meditation": "1" }, body: JSON.stringify(body) }).then(r => r.json());
 async function reloadRecordings() {
@@ -200,6 +200,11 @@ function paintStatus() {
   btn.hidden = recBusy() || !n;
   btn.textContent = recState.angehalten ? "Fortsetzen" : recState.fehler ? "Nochmal versuchen" : "Jetzt vertonen";
   document.getElementById("admRecStop").hidden = !recBusy();
+  // ElevenLabs (Import-Stimme): fehlende Sätze als Text zum Herunterladen; der Helfer übernimmt den Export von selbst
+  const el = recState.elevenlabs || {}, elLink = document.getElementById("admElText");
+  elLink.hidden = recBusy() || !el.text || !el.fehlt;
+  if (el.text) { elLink.href = el.text; elLink.download = el.text.split("/").pop(); }
+  document.getElementById("admElSearch").hidden = elLink.hidden;
   text.title = "";
   if (recState.laeuft) {
     const p = Math.max(0, Math.min(100, recState.prozent || 0));
@@ -213,6 +218,10 @@ function paintStatus() {
     text.title = [recState.stimme, recState.schritt === "Satz wird gesprochen" && recState.gesamt
       ? `Satz ${k} von ${recState.gesamt}: „${recState.aktuell}“` : recState.schritt].filter(Boolean).join(" · ");
   } else if (recState.geplant) text.textContent = `${nSayings(n)} ${werden} gleich vertont`;
+  else if (el.fehlt && el.text) {
+    text.textContent = `${el.fehlt === 1 ? "Ein Satz fehlt" : `${el.fehlt} Sätze fehlen`} bei ElevenLabs`;
+    btn.hidden = true;
+  }
   else if (recState.angehalten) text.textContent = n ? `Vertonung abgebrochen · ${nSayings(n)} noch nicht vertont` : "✓ Alles vertont";
   else if (recState.fehler) text.textContent = `Vertonung abgebrochen: ${recState.fehler}`;
   else text.textContent = n ? `${nSayings(n)} noch nicht vertont` : "✓ Alles vertont";
@@ -243,6 +252,10 @@ async function refreshStatus() {
     updateVoiceNote();
   }
   recSeen = recState.stand;
+  // Ein ElevenLabs-Export wurde übernommen (oder ging nicht): einmal melden
+  const elMeldung = recState.elevenlabs?.meldung || "";
+  if (elSeen !== null && elMeldung && elMeldung !== elSeen) showToast(elMeldung, null, { long: true, danger: /ging nicht/.test(elMeldung) });
+  elSeen = elMeldung;
   // Veröffentlichen, das in dieser Sitzung angestoßen wurde: Ergebnis melden
   const pub = recState.veroeffentlichen || {};
   if (["wartet", "laeuft"].includes(pubSeen) && pub.zustand === "fertig") {
@@ -253,6 +266,7 @@ async function refreshStatus() {
   pubSeen = pub.zustand;
   paintStatus();
   if (adminDlg.open && (recBusy() || pubBusy())) recTimer = setTimeout(refreshStatus, recState.laeuft ? 500 : 1000);
+  else if (adminDlg.open && recState.elevenlabs?.fehlt) recTimer = setTimeout(refreshStatus, 5000);   // wartet auf den Export
 }
 // „Vertonung abbrechen“ (Inhaber): Laufendes endet, nichts Neues beginnt, bis „Fortsetzen“. Gesprochene Sätze bleiben.
 document.getElementById("admRecStop").addEventListener("click", async () => {
@@ -265,6 +279,18 @@ document.getElementById("admRecStop").addEventListener("click", async () => {
     setTimeout(refreshStatus, 500);
   }, { long: true });
   setTimeout(refreshStatus, 800);
+});
+// „Nach ElevenLabs-Downloads suchen“ (Inhaber): übernimmt den Export aus dem Download-Ordner, auch mit anderem Namen
+document.getElementById("admElSearch").addEventListener("click", async () => {
+  const b = document.getElementById("admElSearch");
+  b.disabled = true; b.textContent = "Sucht …";
+  try {
+    const r = await recCall("api/elevenlabs-suchen");
+    if (!r.ok) showToast(r.fehler, null, { danger: true, long: true });
+    else { recState = r; paintStatus(); }
+  } catch { showToast("Der Admin-Helfer antwortet nicht.", null, { danger: true }); }
+  b.disabled = false; b.textContent = "Nach ElevenLabs-Downloads suchen";
+  setTimeout(refreshStatus, 500);
 });
 document.getElementById("admRecBtn").addEventListener("click", async () => {
   try { recState = await recCall("api/vertonen"); } catch { return; }
