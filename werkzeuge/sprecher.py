@@ -31,6 +31,7 @@ THREADS = int(os.environ.get("MEDITATION_THREADS") or max(1, (os.cpu_count() or 
 PARAMETER = {
     "piper": {"v": 1, "satzpause": 0.7},
     "chatterbox": {"v": 1, "exaggeration": 0.4, "cfg_weight": 0.3, "temperature": 0.7},
+    "elevenlabs": {"v": 1},   # spricht nicht selbst: Aufnahmen kommen über werkzeuge/elevenlabs_import.py
 }
 
 
@@ -91,7 +92,9 @@ def chatterbox(stimme, ordner):
 
     def sprechen(text, ziel, variante=0):
         torch.manual_seed(samen(text, variante))
-        y = m.generate(text, language_id="de", **p).squeeze().numpy()
+        # Gedankenstrich „ – “ macht Chatterbox zu „ - “; ein Komma gibt eine sauberere Atempause (nur beim Sprechen,
+        # der Text und damit der Name der Aufnahme bleiben gleich)
+        y = m.generate(text.replace(" – ", ", "), language_id="de", **p).squeeze().numpy()
         wav_schreiben(ziel, float_zu_int16(y), m.sr)
     return sprechen
 

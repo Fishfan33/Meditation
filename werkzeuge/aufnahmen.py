@@ -112,7 +112,8 @@ ABKUERZUNGEN = ("z.", "d.", "u.", "bzw.", "ca.", "Nr.", "vgl.", "usw.", "etc.", 
 def saetze(text):
     teile = []
     for t in SATZENDE.split(text):
-        if teile and teile[-1].endswith(ABKUERZUNGEN):
+        # Ganzes letztes Wort vergleichen, nicht nur die Endung: sonst gälten „Sand.“ oder „sind.“ als „d.“ (Fehler, Oktober 2026)
+        if teile and teile[-1].split()[-1] in ABKUERZUNGEN:
             teile[-1] += " " + t
         else:
             teile.append(t)
@@ -233,8 +234,8 @@ class Stimme:
     def mp3(self, satz):
         if self.alt:
             schluessel = f"{ALT_SETTINGS}|{satz}"
-        else:
-            schluessel = f"{self.kennung}|{self.tempo:.2f}|v2|{satz}"
+        else:   # v3: Satzende ohne Atemrest, MP3 in der Abtastrate der Rohaufnahme mit 96 kbit/s (vorher 22 kHz, 64 kbit/s)
+            schluessel = f"{self.kennung}|{self.tempo:.2f}|v3|{satz}"
         v = self.variante(satz)
         return self.out / (hashlib.sha1(f"{schluessel}{f'|{v}' if v else ''}".encode()).hexdigest()[:12] + ".mp3")
 
@@ -269,17 +270,62 @@ class Sprecher:
         self.p.wait(timeout=60)
 
 
-def umwandeln(roh, ziel, tempo):
+def atemrest_weg(roh, ziel):
+    """Satzende sauber (Inhaber, Oktober 2026: Chatterbox hängt oft einen Atemrest, ein Rauschen oder einen Klick an).
+    Gesucht wird der letzte echte Sprachabschnitt (mindestens 80 ms nicht leiser als 35 dB unter der lautesten Stelle);
+    sobald die Stimme danach unter 42 dB abgeklungen ist, wird nach 30 ms Nachklang mit 40 ms Ausblenden geschnitten.
+    Die Sprache selbst bleibt unverändert. Liefert die entfernten Millisekunden. Ohne Zusatzpakete (System-Python)."""
+    import array, math, wave
+    with wave.open(str(roh)) as w:
+        sr, kanaele, breite = w.getframerate(), w.getnchannels(), w.getsampwidth()
+        werte = array.array("h", w.readframes(w.getnframes()))
+    if kanaele != 1 or breite != 2 or not werte:
+        return 0
+    fr = sr // 100
+    pegel = [math.sqrt(sum(x * x for x in werte[i:i + fr]) / fr) for i in range(0, len(werte) - fr + 1, fr)]
+    spitze = max(pegel) or 1
+    rel = [20 * math.log10(p / spitze) if p > 0 else -200 for p in pegel]
+    ende, lauf = None, 0
+    for k, r in enumerate(rel):
+        lauf = lauf + 1 if r >= -35 else 0
+        if lauf >= 8:
+            ende = k + 1
+    if ende is None:
+        return 0
+    schnitt = next((k for k in range(ende, len(rel)) if rel[k] < -42), len(rel)) * fr + int(sr * 0.03)
+    schnitt = min(schnitt, len(werte))
+    blende = int(sr * 0.04)
+    for i in range(max(0, schnitt - blende), schnitt):
+        werte[i] = int(werte[i] * (schnitt - i) / blende)
+    with wave.open(str(ziel), "wb") as w:
+        w.setnchannels(1); w.setsampwidth(2); w.setframerate(sr); w.writeframes(werte[:schnitt].tobytes())
+    return round((len(werte) - schnitt) / sr * 1000)
+
+
+def umwandeln(roh, ziel, tempo, alt=False):
     """Rohaufnahme → MP3 für die App. Tempo mit Rubber Band (Tonhöhe bleibt), Stille vorn und hinten weg, Lautstärke
-    angleichen, mono 64 kbit/s. Erst in eine Nachbardatei, dann umbenennen: nie eine halbe Datei in stimme/."""
+    angleichen, mono. Abtastrate wie die Rohaufnahme (Chatterbox 24 kHz, Piper 22,05 kHz) mit 96 kbit/s, damit keine
+    Höhen verloren gehen (Oktober 2026, vorher fest 22,05 kHz und 64 kbit/s; alt=True für die alten Piper-Dateinamen).
+    Erst in eine Nachbardatei, dann umbenennen: nie eine halbe Datei in stimme/."""
+    import wave
+    with wave.open(str(roh)) as w:
+        rate = w.getframerate()
+    sauber = None
+    if not alt:   # die alten Piper-Dateien bleiben genau, wie sie sind
+        sauber = ziel.with_name(ziel.stem + ".ende.wav")
+        atemrest_weg(roh, sauber)
+        if sauber.exists():
+            roh = sauber
     filter_ = ([f"rubberband=tempo={tempo:.2f}:pitchq=quality"] if tempo != 1.0 else []) + [
         "silenceremove=start_periods=1:start_threshold=-50dB", "areverse",
         "silenceremove=start_periods=1:start_threshold=-50dB", "areverse",
         "loudnorm=I=-18:TP=-2:LRA=7", "apad=pad_dur=0.15"]
     tmp = ziel.with_name(ziel.stem + ".tmp.mp3")
     subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", str(roh), "-af", ",".join(filter_),
-                    "-ar", "22050", "-ac", "1", "-b:a", "64k", str(tmp)], check=True)
+                    "-ar", "22050" if alt else str(rate), "-ac", "1", "-b:a", "64k" if alt else "96k", str(tmp)], check=True)
     tmp.replace(ziel)
+    if sauber:
+        sauber.unlink(missing_ok=True)
 
 
 def duration(path):
@@ -315,6 +361,11 @@ def main():
 
     todo = [z for z in reihenfolge(eintraege) if not stimme.mp3(z).exists()]
     sprechen = offen()
+    # Import-Programm (ElevenLabs): spricht nicht selbst. Was fehlt, kommt in eine Datei zum Hochladen in Studio;
+    # alles andere wird ganz normal umgewandelt und in die Liste übernommen.
+    import_fehlt = []
+    if katalog()[stimme.programm].get("import"):
+        import_fehlt, sprechen = sprechen, []
     print(f"GESAMT {len(todo)}", flush=True)
     print(f"SPRECHEN {len(sprechen)}", flush=True)
     sprecher, gesprochen = None, 0
@@ -336,11 +387,13 @@ def main():
     if sprecher:
         sprecher.ende()
     alle_saetze = reihenfolge(eintraege)
+    if import_fehlt:   # nur, was es als Aufnahme gibt
+        alle_saetze = [z for z in alle_saetze if stimme.roh(z).exists() or stimme.mp3(z).exists()]
     todo = [z for z in alle_saetze if not stimme.mp3(z).exists()]
     if todo:
         print("PHASE umwandeln", flush=True)
         with ThreadPoolExecutor(4) as pool:   # ffmpeg je Satz, vier gleichzeitig
-            for i, _ in enumerate(pool.map(lambda z: umwandeln(stimme.roh(z), stimme.mp3(z), stimme.tempo), todo), 1):
+            for i, _ in enumerate(pool.map(lambda z: umwandeln(stimme.roh(z), stimme.mp3(z), stimme.tempo, stimme.alt), todo), 1):
                 print(f"UMWANDELN {i}/{len(todo)}", flush=True)
     keep = {stimme.mp3(z).name for z in alle_saetze}
     for f in OUT.glob("*.mp3"):
@@ -358,7 +411,7 @@ def main():
             print(f"LISTE {i}/{len(neu)}", flush=True)
     # Je Spruch die Sätze in Reihenfolge: [[Datei, Sekunden], …]
     texts = [t for t, _ in eintraege]
-    rec = {t: [[name(z), bekannt[name(z)]] for z in saetze(t)] for t in texts}
+    rec = {t: [[name(z), bekannt[name(z)]] for z in saetze(t)] for t in texts if all(name(z) in bekannt for z in saetze(t))}
     # Erst in eine Nachbardatei, dann austauschen: Die App liest nie eine halb geschriebene Liste
     ziel = ROOT / "js/aufnahmen.js"
     tmp = ziel.with_suffix(".tmp")
@@ -380,6 +433,12 @@ def main():
     print(f"{stimme.titel}, Tempo {stimme.tempo:.2f}: {len(texts)} Sprüche, {len(alle_saetze)} Sätze, "
           f"{gesprochen} neu gesprochen, {len(todo)} umgewandelt, zusammen {size / 1e6:.1f} MB")
     print("ENDE", flush=True)
+    if import_fehlt:
+        datei = ROOT / f"hoerproben/{stimme.programm}-fehlend.txt"
+        datei.parent.mkdir(exist_ok=True)
+        datei.write_text("\n\n".join(import_fehlt) + "\n", encoding="utf-8")
+        sys.exit(f"{len(import_fehlt)} Sätze fehlen noch bei {katalog()[stimme.programm]['name']}. "
+                 f"Zum Hochladen in Studio: {datei.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":

@@ -153,11 +153,28 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
 - **Audit (Inhaber, Oktober 2026):** Wenn der Aufbau fertig ist und vor den Texten ein umfassendes Audit der
   Meditations-App über alle Bereiche aus `~/.claude/CLAUDE.md` („Audits“), mit Bericht; danach das Retro-Cockpit.
 - Automatische Tests (`werkzeuge/tests.py` nach Vorlage des Retro-Cockpits) fehlen noch.
+- **Für später vorgemerkt (Inhaber, 8. Oktober 2026): automatische Prüfung der Vertonung.** Jetzt gilt: der Inhaber hört
+  an und lässt schiefe Sätze mit „Neu sprechen“ neu sprechen. Möglich wäre (a) Whisper als Sicherheitsnetz nach der
+  Vertonung (findet verschluckte oder doppelte Wörter, Gemurmel; nicht den Klang) und (b) eine automatische
+  Klangbewertung (Natürlichkeit, z. B. blecherne Laute; meist auf Englisch trainiert). Beides nur nacheinander mit
+  Chatterbox (Speicher), Downloads vorher prüfen.
 - **Security-Audit (Oktober 2026), vor dem ersten Hochladen:** behoben: Helfer liefert nur der eigenen Seite aus (Host
   geprüft, keine versteckten Ordner wie `.git`, keine Ordnerlisten), Datenschutzseite auf die Aufnahmen angepasst, keine
   persönlichen Angaben in Projektdateien („der Inhaber“); erstes Hochladen als neue Geschichte (siehe oben).
 
 ## Stimmen (Stand 7. Oktober 2026)
+
+- **Wahl des Inhabers (8. Oktober 2026): ElevenLabs „Helmut – warm, gentle and soothing“** (`elevenlabs`/`helmut`),
+  nach Hörprobe mit dem Kraftort „Bergsee“ (`hoerproben/elevenlabs-bergsee/`). Import-Programm (`"import": true` in
+  stimmen.json): spricht nicht selbst. Ablauf: alle Sätze als ein Dokument (`hoerproben/elevenlabs-alle/
+  meditation-alle-saetze.txt`, ein Satz je Absatz) in ElevenLabs Studio hochladen, als eine MP3 exportieren,
+  `python3 werkzeuge/elevenlabs_import.py <export.mp3> <texte.txt>` teilt sie an den Satzpausen (`werkzeuge/teilen.py`,
+  Schnitte passend zur Satzlänge; Test mit 190 Sätzen: 189/189 richtig) und legt die Rohaufnahmen ab; danach wie bei
+  jeder Stimme vertonen. Fehlen Sätze (neue oder geänderte Sprüche), endet die Vertonung mit „… Sätze fehlen noch bei
+  ElevenLabs“ und schreibt sie nach `hoerproben/elevenlabs-fehlend.txt` zum Hochladen; neu exportierte Fassungen
+  bekommen eine neue Variante. **Nennung (Wahl des Inhabers, Variante A, 8. Oktober 2026):** im Stimmhinweis unter dem
+  Startkreis „Es liest „Helmut“ von elevenlabs.io“ (`VOICE_CREDITS` in js/stimme.js) und in datenschutz.html.
+  Chatterbox „Karlsson ruhig“ und Piper bleiben als Ersatzstimmen eingerichtet.
 
 - **Wahl des Inhabers (7. Oktober 2026): Chatterbox mit Vorlage „Karlsson“** (`chatterbox`/`karlsson`), Tempo 100 %.
   **Vertonung erst nach ausdrücklicher Zustimmung des Inhabers starten** (dauert etwa 3 Stunden; Umstellen der Stimme über
@@ -179,10 +196,20 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
   Piper Thorsten bei 100 % behält die alten Dateinamen (keine neuen Aufnahmen nötig).
 - Wahl im Admin-Bereich unter „Einstellungen“ (Variante A): Programm-Umschalter, Stimmen mit Hörprobe und „Wählen“ (mit Rückgängig), Sprechtempo 80–120 %, Pause.
   `config.js` `settings.stimme = {programm, stimme, tempo}` (fehlt = Standard), geprüft in `cleanVoice` und im Helfer.
+- **Gewählt nach der Vergleichsrunde (Inhaber, 8. Oktober 2026): Variante 3 „ruhigere Vorlage“** → Stimme
+  `chatterbox`/`karlsson-ruhig` (Vorlage mit Piper ×1,35 statt ×1,15 erzeugt), Einstellungen unverändert (Ausdruck 0,4,
+  Führung 0,3, Zufall 0,7), jeder Satz einzeln. Atemrest am Satzende stört den Inhaber: wird abgeschnitten
+  (`atemrest_weg`). Einzelne blecherne Laute (z. B. „D“ in „Du bist hier.“) mit „Neu sprechen“ beheben.
+- **Klangqualität (Oktober 2026):** MP3 in der Abtastrate der Rohaufnahme (Chatterbox 24 kHz) mit 96 kbit/s, vorher fest
+  22,05 kHz/64 kbit/s (Höhen gingen verloren); Piper Thorsten bei 100 % behält das alte Format und die alten Namen.
+  Chatterbox bekommt „ – “ als Komma (nur beim Sprechen). Vergleichsrunde mit vier Varianten (jetzt, am Stück,
+  ruhigere Vorlage, ruhigere Einstellungen): `hoerproben/vergleich-einstellungen/`.
 - **Vorlage tauschen:** Der Zwischenspeicher erkennt eine Stimme an ihrem Eintrag in `stimmen.json` (Dateiname der
   Vorlage), nicht am Inhalt der WAV-Datei. Eine neue Vorlage deshalb immer unter neuem Namen und als neuen Eintrag
   anlegen (z. B. `karlsson-echt`), nie `karlsson.wav` überschreiben, sonst gelten alte Rohaufnahmen weiter.
-  Echte Karlsson-Ausschnitte (M-AILABS, LibriVox) zum Anhören: `hoerproben/karlsson-vorlagen/` (Inhaber wählt).
+  **Vorlage A bleibt (Inhaber, 7. Oktober 2026):** Im Hörvergleich (`hoerproben/vergleich-karlsson/`, einzelne Sätze und
+  ein 30-s-Abschnitt) klang die bisherige, mit Piper erzeugte Vorlage natürlicher als ein echter Karlsson-Ausschnitt
+  (Nr. 81, „Der Sandmann“, M-AILABS/LibriVox): Hörbuch-Betonung und Raumklang der echten Aufnahme übertragen sich.
 - **Chatterbox auf diesem Rechner (gemessen 7. Oktober 2026):** Laden ~2 Min., 50–80 s je Satz (4 Rechenkerne, Standard),
   **~5 GB Arbeitsspeicher** bei 7,5 GB im Rechner. Läuft die Claude-App gleichzeitig, beendet der Speicher-Notfallschutz
   Prozesse (so zweimal am 7. Oktober 2026). Lange Vertonungen deshalb ohne Claude-App und ohne Browser laufen lassen.

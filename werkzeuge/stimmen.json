@@ -12,6 +12,15 @@
    "mls-3503": {"name": "Sprecher 3503", "modell": "de_DE-mls-medium", "sprecher": "3503", "length_scale": 1.15, "probe": "piper-5-mls-3503.mp3"}
   }
  },
+ "elevenlabs": {
+  "name": "ElevenLabs",
+  "import": true,
+  "sekunden_je_satz": 0,
+  "_hinweis": "Spricht nicht selbst: Studio-Export (eine MP3) mit werkzeuge/elevenlabs_import.py übernehmen. Nennung „elevenlabs.io“ im Stimmhinweis (js/stimme.js).",
+  "stimmen": {
+   "helmut": {"name": "Helmut", "probe": "elevenlabs-helmut.mp3"}
+  }
+ },
  "chatterbox": {
   "name": "Chatterbox",
   "ordner": "meditation-chatterbox",
@@ -21,6 +30,7 @@
    "thorsten": {"name": "Thorsten", "vorlage": "thorsten.wav", "probe": "chatterbox-1-thorsten.mp3"},
    "thorsten-schlaefrig": {"name": "Thorsten schläfrig", "vorlage": "thorsten-schlaefrig.wav", "probe": "chatterbox-2-thorsten-schlaefrig.mp3"},
    "karlsson": {"name": "Karlsson", "vorlage": "karlsson.wav", "probe": "chatterbox-3-karlsson.mp3"},
+   "karlsson-ruhig": {"name": "Karlsson ruhig", "vorlage": "karlsson-ruhig.wav", "probe": "chatterbox-6-karlsson-ruhig.mp3"},
    "mls-11546": {"name": "Sprecher 11546", "vorlage": "mls-11546.wav", "probe": "chatterbox-4-mls-11546.mp3"},
    "mls-11480": {"name": "Sprecher 11480", "vorlage": "mls-11480.wav", "probe": "chatterbox-5-mls-11480.mp3"}
   }
