@@ -182,7 +182,14 @@ header h1 { margin: 0; font-size: 21px; line-height: 1.2; }
   background: var(--surface); color: var(--text); font: inherit; font-size: 15px; cursor: pointer;
 }
 .place.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent, #fff); font-weight: 700; font-synthesis: none; }
-.place-off { border-style: dashed; color: var(--muted); }
+/* Kraftort-Zeile aus zwei Knöpfen: Zahl (ab- und anwählen) und Name (Orte aufklappen), sieht aus wie die anderen */
+.chip-split { cursor: default; padding: 0; grid-template-columns: 50px minmax(0, 1fr); gap: 0; }
+.chip-split .chip-no-btn { width: 44px; height: 44px; margin-left: 6px; border: 0; background-clip: content-box; padding: 8px;
+  color: inherit; font: inherit; font-size: 14px; font-weight: 700; font-synthesis: none; cursor: pointer; }
+.chip-split.off .chip-no-btn { border: 0; background: transparent; outline: 1.5px dashed color-mix(in srgb, var(--muted) 55%, transparent);
+  outline-offset: -9px; }
+.chip-main { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 52px;
+  padding: 8px 14px 8px 4px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 
 /* ---------- Unten: Zeiten der Phasen zum Aufklappen ---------- */
 .fold { margin-top: 22px; border-top: 1px solid var(--border); }

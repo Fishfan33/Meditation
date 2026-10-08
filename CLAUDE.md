@@ -99,7 +99,8 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
   - **Kraftort-Auswahl für Gäste (Wahl des Inhabers, Variante C, 8. Oktober 2026):** Antippen der Phase Kraftort klappt
     die Orte als Knöpfe darunter auf (vorher verdeckt); Orte = im Admin-Bereich aktive Kraftort-Gruppen mit aktiven
     Sprüchen. Standard „Zufällig“ (wählt beim Starten einen Ort); ist nur ein Ort aktiv, steht nur dieser da, ohne
-    „Zufällig“. Darunter „Nicht dabei“ zum Auslassen (Antippen nimmt die Phase wieder auf). Nur im Speicher
+    „Zufällig“. **Abwählen über die Zahl** wie bei den anderen Phasen (Inhaber, 8. Oktober 2026; kein eigener Knopf):
+    die Zeile besteht aus zwei Knöpfen, Zahl (ab/an) und Name (Orte aufklappen). Nur im Speicher
     (`state.kraftort`, `placeGroups()`, `placeSayings()` in js/zustand.js).
   - **Sätze nacheinander mit einstellbarer Sprechpause** (Inhaber, 6. Oktober 2026): zuerst 1,1 s, dann „etwas länger“,
     Standard jetzt 2,0 s, im Admin-Bereich unter „Einstellungen“ 0,5–10 s in Zehntelsekunden (`settings.pause` in
@@ -184,9 +185,9 @@ Push und Übernahme-Anfragen nur nach OK) stehen in `~/.claude/CLAUDE.md`. Hier 
   ElevenLabs“ und schreibt sie nach `hoerproben/elevenlabs-fehlend.txt` zum Hochladen; neu exportierte Fassungen
   bekommen eine neue Variante. **Geänderte Sätze (Inhaber, 8. Oktober 2026):** Statuszeile „N Sätze fehlen bei
   ElevenLabs“ mit Link „Text für ElevenLabs“ (`hoerproben/elevenlabs-auftraege/meditation-neu-<Zeit>.txt`) und Knopf
-  „Nach ElevenLabs-Downloads suchen“; ein Wächter im Helfer übernimmt Exporte aus `~/Downloads`, deren Name zur
-  Textdatei passt, von selbst (der Knopf auch andere, wenn die Länge passt); danach vertonen, „Veröffentlichen“ wartet
-  bis dahin. Übernommene Exporte: `~/.local/share/meditation-app/elevenlabs-importiert.json`.
+  „Nach ElevenLabs-Downloads suchen“ (Wahl des Inhabers B, 8. Oktober 2026: nur Knopf, kein Wächter im Hintergrund):
+  übernimmt aus `~/Downloads` zuerst einen Export, dessen Name zur Textdatei passt, sonst den neuesten, wenn die Länge
+  passt; danach vertonen, „Veröffentlichen“ wartet bis dahin. Übernommene Exporte: `~/.local/share/meditation-app/elevenlabs-importiert.json`.
   **Nennung (Wahl des Inhabers, Variante A, 8. Oktober 2026):** im Stimmhinweis unter dem
   Startkreis „Es liest „Helmut“ von elevenlabs.io“ (`VOICE_CREDITS` in js/stimme.js) und in datenschutz.html.
   Chatterbox „Karlsson ruhig“ und Piper bleiben als Ersatzstimmen eingerichtet.

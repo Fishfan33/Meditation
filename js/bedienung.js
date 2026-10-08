@@ -55,20 +55,15 @@ document.getElementById("startBtn").addEventListener("click", startSession);
 
 // ---------- Phasen an- und abwählen ----------
 document.getElementById("chips").addEventListener("click", e => {
-  // Kraftort: Ort wählen, auslassen, Auswahl auf- und zuklappen (Variante C des Inhabers)
+  // Kraftort: Ort wählen, Auswahl auf- und zuklappen (Variante C des Inhabers); die Zahl wählt ab und an wie überall
   const ort = e.target.closest("[data-place]");
   if (ort) { state.kraftort = ort.dataset.place; render(); document.querySelector(`[data-place="${CSS.escape(ort.dataset.place)}"]`)?.focus(); return; }
-  if (e.target.closest("[data-place-off]")) {
-    const k = PHASES.findIndex(p => p.id === "kraftort");
-    if (activeIdx().length === 1) { showToast("Eine Phase bleibt mindestens dabei."); return; }
-    setActive(k, false); state.ortOffen = false; render(); return;
-  }
   const chip = e.target.closest("[data-chip]");
   if (!chip) return;
   if (chip.hasAttribute("data-place-toggle") && state.plan[Number(chip.dataset.chip)].active) {
     state.ortOffen = !state.ortOffen; render(); document.querySelector("[data-place-toggle]")?.focus(); return;
   }
-  if (chip.hasAttribute("data-place-toggle")) state.ortOffen = true;   // wieder aufnehmen: Orte gleich zeigen
+  if (chip.classList.contains("chip-no-btn")) state.ortOffen = false;   // Zahl: nur ab- oder anwählen
   const i = Number(chip.dataset.chip);
   if (state.plan[i].active && activeIdx().length === 1) { showToast("Eine Phase bleibt mindestens dabei."); return; }
   const before = state.duration;

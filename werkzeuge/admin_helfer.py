@@ -23,10 +23,10 @@ admin-helfer.log daneben).
   gesprochene Sätze bleiben im Zwischenspeicher. /api/herkunft: je Spruch, mit welcher Stimme er aufgenommen ist.
 - ElevenLabs (Import-Programm, Inhaber, Oktober 2026): Fehlen Sätze, legt der Helfer eine Textdatei mit genau diesen
   Sätzen an (hoerproben/elevenlabs-auftraege/meditation-neu-<Zeit>.txt; der Admin-Bereich bietet sie zum Herunterladen
-  an). Ein Wächter schaut alle 5 s in den Download-Ordner; kommt dort der Studio-Export an
-  („ElevenLabs_meditation-neu-<Zeit>.mp3“), übernimmt er ihn (werkzeuge/elevenlabs_import.py) und vertont danach.
-  Knopf „Nach ElevenLabs-Downloads suchen“ (/api/elevenlabs-suchen): auch Exporte mit anderem Namen, wenn ihre Länge
-  zu den fehlenden Sätzen passt. Übernommene Exporte merkt sich der Helfer (elevenlabs-importiert.json). Wechselt die
+  an). Den Studio-Export übernimmt der Knopf „Nach ElevenLabs-Downloads suchen“ (/api/elevenlabs-suchen, Wahl des
+  Inhabers: nur Knopf, kein Wächter): zuerst einen Export, dessen Name zur Textdatei passt
+  („ElevenLabs_meditation-neu-<Zeit>.mp3“), sonst den neuesten, wenn seine Länge zu den fehlenden Sätzen passt; danach
+  vertonen (werkzeuge/elevenlabs_import.py). Übernommene Exporte merkt sich der Helfer (elevenlabs-importiert.json). Wechselt die
   Stimme oder das Tempo während einer Vertonung, bricht der Helfer sie ab und beginnt mit der neuen (schon Gesprochenes
   bleibt im Zwischenspeicher). POST /api/stimmen liefert die Auswahl mit Hörproben, /api/neu-sprechen eine neue
   Variante eines Spruchs.
@@ -419,7 +419,7 @@ def import_programm(root):
 
 def elevenlabs_auftrag(root):
     """Nach einer Vertonung mit fehlenden Sätzen: Textdatei zum Hochladen in Studio (je Satz ein Absatz). Gleicher
-    Inhalt wie die letzte Datei: dieselbe Datei; sonst eine neue mit Uhrzeit im Namen (daran erkennt der Wächter den
+    Inhalt wie die letzte Datei: dieselbe Datei; sonst eine neue mit Uhrzeit im Namen (daran erkennt der Knopf den
     Export wieder)."""
     root = Path(root)
     quelle = root / "hoerproben/elevenlabs-fehlend.txt"
@@ -473,23 +473,6 @@ def fertig_geschrieben(f):
     groesse = f.stat().st_size
     time.sleep(2)
     return f.stat().st_size == groesse
-
-
-def waechter(root):
-    """Schaut alle 5 s in den Download-Ordner: Ein Export, dessen Name zu einer bereitgestellten Textdatei passt und
-    der noch nicht übernommen wurde, wird übernommen (sicherer Fall; alles andere nur über den Knopf „Suchen“)."""
-    root = Path(root)
-    while True:
-        time.sleep(5)
-        try:
-            if not import_programm(root) or not DOWNLOADS.is_dir():
-                continue
-            fertig = schon_importiert()
-            for f in sorted(DOWNLOADS.glob("ElevenLabs_*.mp3"), key=lambda f: f.stat().st_mtime):
-                if kennung_export(f) not in fertig and auftrag_zu(root, f) and fertig_geschrieben(f):
-                    elevenlabs_uebernehmen(root, f, auftrag_zu(root, f))
-        except OSError as e:
-            print(f"Wächter: {e!r}", file=sys.stderr, flush=True)
 
 
 def elevenlabs_suchen(root):
@@ -888,7 +871,7 @@ def auftrag_ausfuehren(repo, kopie, nummer):
             time.sleep(1)
             continue
         if fehlende(repo):
-            if ELEVEN["fehlt"] and angestossen:   # wartet auf den ElevenLabs-Export (der Wächter vertont danach)
+            if ELEVEN["fehlt"] and angestossen:   # wartet auf den ElevenLabs-Export (Knopf „Suchen“, danach wird vertont)
                 time.sleep(5)
                 continue
             if VERTONUNG["fehler"] and angestossen:
@@ -1070,7 +1053,6 @@ def starten(root, port, kopie=KOPIE, adressen=("127.0.0.1", "127.0.0.2", "::1"))
     # Nach einem Neustart (Rechner, Anmeldung): Fehlt noch etwas, geht die Vertonung von selbst weiter, wo sie war
     vertonen_anstossen(Path(root))
     elevenlabs_auftrag(Path(root))
-    threading.Thread(target=waechter, args=(Path(root),), daemon=True).start()
     return server
 
 

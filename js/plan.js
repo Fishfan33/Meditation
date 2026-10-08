@@ -69,22 +69,24 @@ function chipsMarkup() {
       <span class="chip-min">${s.active ? fmtMin(s.minutes) : "nicht dabei"}</span></button>`;
   }).join("");
 }
-// Kraftort mit Orten (Variante C des Inhabers): Antippen klappt die Orte auf; „Nicht dabei“ lässt die Phase aus.
-// Standard „Zufällig“; ist nur ein Ort aktiv, steht nur er da.
+// Kraftort mit Orten (Variante C des Inhabers): Antippen des Namens klappt die Orte auf; die Zahl wählt die Phase ab
+// und wieder an wie bei den anderen Phasen (Inhaber). Standard „Zufällig“; ist nur ein Ort aktiv, steht nur er da.
+// Zwei Knöpfe in einer Zeile (kein Knopf im Knopf), die Zeile sieht aus wie die anderen.
 function placeChip(p, i, s, orte) {
   const gewaehlt = chosenPlace();
   const name = gewaehlt ? gewaehlt.name : "Zufällig";
-  const chip = `<button class="chip${s.active ? "" : " off"}" data-chip="${i}" data-place-toggle aria-expanded="${s.active && state.ortOffen}"
-      aria-controls="placeOptions" style="--ph:var(--p${i + 1})" title="${s.active ? "Antippen, um den Ort zu wählen" : "Antippen zum Aufnehmen"}">
-      <span class="chip-no" aria-hidden="true">${phaseNo(i) ?? ""}</span>
-      <span class="chip-name">${esc(p.name)}${s.active ? ` <span class="chip-place">· ${esc(name)}</span>` : ""}</span>
-      <span class="chip-min">${s.active ? fmtMin(s.minutes) : "nicht dabei"}</span></button>`;
+  const chip = `<div class="chip chip-split${s.active ? "" : " off"}" style="--ph:var(--p${i + 1})">
+      <button class="chip-no chip-no-btn" data-chip="${i}" aria-pressed="${s.active}"
+        aria-label="${esc(p.name)} ${s.active ? "auslassen" : "aufnehmen"}" title="${s.active ? "Antippen zum Auslassen" : "Antippen zum Aufnehmen"}">${phaseNo(i) ?? ""}</button>
+      <button class="chip-main" data-chip="${i}" data-place-toggle aria-expanded="${s.active && state.ortOffen}" aria-controls="placeOptions"
+        title="${s.active ? "Antippen, um den Ort zu wählen" : "Antippen zum Aufnehmen"}">
+        <span class="chip-name">${esc(p.name)}${s.active ? ` <span class="chip-place">· ${esc(name)}</span>` : ""}</span>
+        <span class="chip-min">${s.active ? fmtMin(s.minutes) : "nicht dabei"}</span></button></div>`;
   if (!s.active || !state.ortOffen) return chip;
   const wahl = [...(orte.length > 1 ? [{ id: "zufall", name: "Zufällig" }] : []), ...orte];
   const an = id => (orte.length === 1 || state.kraftort === id || (id === "zufall" && !gewaehlt));
   return chip + `<div class="places" id="placeOptions" role="radiogroup" aria-label="Kraftort wählen">${wahl.map(o =>
-    `<button class="place${an(o.id) ? " on" : ""}" role="radio" aria-checked="${an(o.id)}" data-place="${esc(o.id)}">${esc(o.name)}</button>`).join("")}
-    <button class="place place-off" data-place-off>Nicht dabei</button></div>`;
+    `<button class="place${an(o.id) ? " on" : ""}" role="radio" aria-checked="${an(o.id)}" data-place="${esc(o.id)}">${esc(o.name)}</button>`).join("")}</div>`;
 }
 
 // ---------- Hintergrundklang ----------

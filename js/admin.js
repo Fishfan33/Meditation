@@ -200,7 +200,7 @@ function paintStatus() {
   btn.hidden = recBusy() || !n;
   btn.textContent = recState.angehalten ? "Fortsetzen" : recState.fehler ? "Nochmal versuchen" : "Jetzt vertonen";
   document.getElementById("admRecStop").hidden = !recBusy();
-  // ElevenLabs (Import-Stimme): fehlende Sätze als Text zum Herunterladen; der Helfer übernimmt den Export von selbst
+  // ElevenLabs (Import-Stimme): fehlende Sätze als Text zum Herunterladen; den Export übernimmt der Knopf daneben
   const el = recState.elevenlabs || {}, elLink = document.getElementById("admElText");
   elLink.hidden = recBusy() || !el.text || !el.fehlt;
   if (el.text) { elLink.href = el.text; elLink.download = el.text.split("/").pop(); }
