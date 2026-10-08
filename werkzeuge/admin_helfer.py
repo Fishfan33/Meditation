@@ -821,6 +821,66 @@ def offen_zaehlen(root):
         return None   # unbekannt (z. B. noch nicht mit GitHub verbunden)
 
 
+# ---------- Reiter „Veröffentlichen“ (Wahl des Inhabers, Variante B, Oktober 2026) ----------
+# Liste der geänderten Sprüche (gegenüber dem Original auf GitHub) mit Stand der Vertonung, Ordner der Textdateien in
+# der Dateiverwaltung öffnen, Merkzettel für die ElevenLabs-Einstellungen (nur auf diesem Rechner), und nach dem
+# Veröffentlichen prüfen, ob GitHub Pages den neuen Stand schon ausliefert.
+def aenderungen(root):
+    root = Path(root)
+    try:
+        alt_text = git("show", "origin/main:config.js", cwd=root)
+        m = re.search(r"window\.MEDITATION_CONFIG\s*=\s*(.*);\s*$", alt_text, re.S)
+        alt = json.loads(m.group(1)) if m else None
+    except (Fehler, ValueError):
+        return {"ok": False, "fehler": "Der Stand auf GitHub ist nicht bekannt."}
+    neu = gespeichert(root)
+    alte_texte = {x.get("text") for p in PHASEN for x, _ in flach((alt or {}).get("sayings", {}).get(p, []))}
+    fehlt = set(fehlende(root))
+    namen = {"einstimmung": "Einstimmung", "bodyscan": "Bodyscan", "kraftort": "Kraftort",
+             "unterbewusst": "Unterbewusstes", "rueckkehr": "Rückkehr"}
+    saetze = [{"text": x["text"], "phase": namen[p], "gruppe": (g or {}).get("name", ""), "vertont": x["text"] not in fehlt}
+              for p in PHASEN for x, g in flach(neu["sayings"][p]) if x["text"] not in alte_texte]
+    return {"ok": True, "saetze": saetze, "aenderungen": unterschiede(alt, neu, GRUNDBESTAND[0]),
+            "ordner": "hoerproben/elevenlabs-auftraege"}
+
+
+def ordner_oeffnen(root):
+    ordner = Path(root) / "hoerproben/elevenlabs-auftraege"
+    ordner.mkdir(parents=True, exist_ok=True)
+    try:
+        subprocess.Popen(["xdg-open", str(ordner)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         start_new_session=True)
+    except OSError:
+        raise Fehler("Die Dateiverwaltung ließ sich nicht öffnen.")
+    return {"ok": True}
+
+
+def merkzettel(entwurf):
+    datei = SICHERUNGEN.parent / "elevenlabs-merkzettel.txt"
+    text = entwurf.get("text")
+    if isinstance(text, str):
+        datei.parent.mkdir(parents=True, exist_ok=True)
+        datei.write_text(re.sub(r"[\x00-\x08\x0b-\x1f\x7f]", "", text)[:1000], encoding="utf-8")
+    try:
+        return {"ok": True, "text": datei.read_text(encoding="utf-8")}
+    except OSError:
+        return {"ok": True, "text": ""}
+
+
+def online_pruefen(repo, kopie):
+    """Liefert GitHub Pages schon den zuletzt veröffentlichten Stand? Vergleicht config.js der Seite mit der eigenen
+    Kopie des Originals. Die Adresse ergibt sich aus dem GitHub-Projekt (origin)."""
+    import urllib.request
+    try:
+        url = git("remote", "get-url", "origin", cwd=repo)
+        m = re.search(r"github\.com[:/]([^/]+)/([^/.]+)", url)
+        seite = f"https://{m.group(1).lower()}.github.io/{m.group(2)}/config.js?t={int(time.time())}"
+        online = urllib.request.urlopen(seite, timeout=8).read()
+        return {"ok": True, "online": online == (Path(kopie) / "config.js").read_bytes()}
+    except Exception:
+        return {"ok": True, "online": None}   # unbekannt (kein Netz o. ä.)
+
+
 def abgleichen(entwurf, root):
     """Beim Öffnen des Admin-Bereichs: den Stand von GitHub im Hintergrund holen, damit die Zahl stimmt."""
     grundbestand(entwurf)
@@ -1003,6 +1063,10 @@ class Helfer(http.server.SimpleHTTPRequestHandler):
                     "/api/vertonung-anhalten": lambda e: vertonung_anhalten(self.root),
                     "/api/herkunft": lambda e: herkunft_liste(self.root),
                     "/api/elevenlabs-suchen": lambda e: elevenlabs_suchen(self.root),
+                    "/api/aenderungen": lambda e: aenderungen(self.root),
+                    "/api/ordner-oeffnen": lambda e: ordner_oeffnen(self.root),
+                    "/api/merkzettel": merkzettel,
+                    "/api/online-pruefen": lambda e: online_pruefen(self.root, self.kopie),
                     "/api/vorschau": lambda e: vorschau(e, self.root, self.kopie),
                     "/api/veroeffentlichen": lambda e: veroeffentlichen(e, self.root, self.kopie)}
         if pfad not in aktionen:

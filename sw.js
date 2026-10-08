@@ -6,12 +6,12 @@
 // Ändert sich irgendeine App-Datei, ändert sich damit diese Datei: Der Browser installiert sie neu,
 // und die App bietet „Neue Version verfügbar, neu laden“ an (übernommen wird erst nach dem Klick).
 // Braucht die App eine neue Datei (Bild, Seite, Skript, Aufnahme), sie hier in FILES ergänzen.
-const VERSION = "257b3ae3";
+const VERSION = "31c34b6c";
 const CACHE = "meditation-" + VERSION;
 const FILES = [
   "./",
   "datenschutz.html",
-  "app.css?v=3360769a",
+  "app.css?v=9391f6b7",
   "js/phasen.js?v=4a1758aa",
   "js/texte.js?v=fa937935",
   "js/zustand.js?v=010f5d0c",
@@ -23,7 +23,7 @@ const FILES = [
   "js/klangring.js?v=0b302aff",
   "js/bedienung.js?v=446d21f7",
   "config.js?v=ca4a34b3",
-  "js/admin.js?v=f0295103",
+  "js/admin.js?v=b0030949",
   "js/start.js?v=bf25bd92",
   "manifest.json",
   "fonts/AtkinsonHyperlegible-Regular.woff2",
