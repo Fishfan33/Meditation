@@ -247,7 +247,7 @@ window.MEDITATION_CONFIG = {
    {
     "id": "g-strand",
     "name": "Strand",
-    "active": false,
+    "active": true,
     "items": [
      {
       "id": "strand1",
@@ -289,7 +289,7 @@ window.MEDITATION_CONFIG = {
    {
     "id": "g-wald",
     "name": "Wald",
-    "active": false,
+    "active": true,
     "items": [
      {
       "id": "wald1",
@@ -373,7 +373,7 @@ window.MEDITATION_CONFIG = {
    {
     "id": "g-see",
     "name": "Bergsee",
-    "active": false,
+    "active": true,
     "items": [
      {
       "id": "see1",
@@ -410,7 +410,7 @@ window.MEDITATION_CONFIG = {
    {
     "id": "g-garten",
     "name": "Garten",
-    "active": false,
+    "active": true,
     "items": [
      {
       "id": "garten1",
@@ -680,7 +680,7 @@ window.MEDITATION_CONFIG = {
    },
    {
     "id": "unt-mux75lc17y",
-    "text": "Eine Sekunde kann sich im Unterbewussten ausdehen zu Jahren, in denen du Zeit hast deine Fähigkeiten zu aktivieren.",
+    "text": "Eine Sekunde kann sich im Unterbewussten ausdehnen zu Jahren, in denen du Zeit hast, deine Fähigkeiten zu aktivieren.",
     "active": true
    }
   ],
@@ -759,7 +759,7 @@ window.MEDITATION_CONFIG = {
      },
      {
       "id": "rue-mux5ntfp1c",
-      "text": "Wenn du die Augen öffnest, bist du wach. Wacher als heute morgen nach dem Aufstehen.",
+      "text": "Wenn du die Augen öffnest, bist du wach. Wacher als heute Morgen nach dem Aufstehen.",
       "active": true
      }
     ]
@@ -773,6 +773,11 @@ window.MEDITATION_CONFIG = {
   "meer": true
  },
  "settings": {
-  "pause": 2.5
+  "pause": 2.5,
+  "stimme": {
+   "programm": "elevenlabs",
+   "stimme": "helmut",
+   "tempo": 1.0
+  }
  }
 };
